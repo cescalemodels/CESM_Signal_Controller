@@ -11,6 +11,9 @@ int stepLength = 25;                                        // Amount of time be
 byte ledInterval[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t FactoryDefaultCVIndex = 0;
 
+uint8_t  commonPole ;
+uint16_t baseAddress ;
+
 CVPair FactoryDefaultCVs[] =
 {
   {CV_ACCESSORY_DECODER_ADDRESS_LSB, DEFAULT_ADDRESS},
@@ -57,39 +60,44 @@ CVPair FactoryDefaultCVs[] =
   {69, 50},         //  Period of flashing for signal head C (0 = disabled, 50 = 1 flash per second, 100 = 2 flash per second)
 };
 
-int commonPole = Dcc.getCV(30);
-
 void notifyDccSigState( uint16_t Addr, uint8_t headIndex, uint8_t State) //TODO: 0 or 1 based determination for headIndex
 {
-  if(Dcc.getCV(50 + headIndex))
-  {
-    
-  }
-  else
-  {
-    headStates[headIndex].currLens = aspectTable[State].lensNumber;
-    
-    ledInterval[ headIndex * 3 ] = Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ));
-    ledInterval[ (headIndex * 3) + 1 ] = Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 1);
-    ledInterval[ (headIndex * 3) + 2 ] = Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 2);
-    
-    headStates[headIndex].prevAspect = headStates[headIndex].currAspect;
-    headStates[headIndex].currAspect = State;
-    headStates[headIndex].headStatus = STATE_IDLE;
-  }
+  if( (Addr < baseAddress) || (Addr >= (baseAddress + NUM_HEADS)))  // Make sure we're only looking at our addresses
+    return;
+
+  if( State > NUM_ASPECTS)  // Check we've got a valid Aspect
+    return; 
+  
+  headIndex = Addr - baseAddress; // Compute your own headIndex for now as the library is probably NOT doing the right thing...
+
+  headStates[headIndex].currLens = aspectTable[State].lensNumber;
+  
+  ledInterval[ headIndex * 3 ] = Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ));
+  ledInterval[ (headIndex * 3) + 1 ] = Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 1);
+  ledInterval[ (headIndex * 3) + 2 ] = Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 2);
+  
+  headStates[headIndex].prevAspect = headStates[headIndex].currAspect;
+  headStates[headIndex].currAspect = State;
+  headStates[headIndex].headStatus = STATE_IDLE;
 }
 
 void notifyCVChange( uint16_t CV, uint8_t Value ) 
 {
-  if( CV == 30 )
+  switch(CV)
   {
-    commonPole = Dcc.getCV(30);
+    case CV_ACCESSORY_DECODER_ADDRESS_LSB:
+    case CV_ACCESSORY_DECODER_ADDRESS_MSB:
+      baseAddress = Dcc.getAddr();
+      break;
+
+    case 30:
+      commonPole = Value;
   }
 }
 
 ISR(TIM0_OVF_vect) 
 {
-  for(int i = 0; i < sizeof(ledInterval); i++) 
+  for(int i = 0; i < NUM_PINS; i++) 
   {
     if(ledInterval[i] < pwmTimer)                       //  If the pin's current PWM value is less than 
     {
@@ -125,7 +133,7 @@ ISR(TIM0_OVF_vect)
 
 void setup() 
 {
-  for(int i = 0; i < sizeof(LED_CONTROL_PINS); i++) {
+  for(int i = 0; i < NUM_PINS; i++) {
     pinMode(LED_CONTROL_PINS[i], OUTPUT);
   }
   
@@ -134,6 +142,9 @@ void setup()
   
   Dcc.pin(0, DCC_READ_PIN, 1);  // Setup which External Interrupt, the Pin it's associated with that we're using and enable the Pull-Up
   Dcc.init( MAN_ID_DIY, 10, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE, 0 );
+
+  commonPole = Dcc.getCV(30);
+  baseAddress = Dcc.getAddr();
 
   bitClear(TCCR0A, COM0A1);
   bitClear(TCCR0A, COM0A0);

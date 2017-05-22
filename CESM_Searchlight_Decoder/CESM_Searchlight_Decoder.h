@@ -28,6 +28,7 @@ byte  lensArrangement[] = {GREEN, RED, YELLOW, LUNAR};
 #define NUM_HEADS     3                                           //  Defines 3 heads on signal decoder if the searchlight configuration is selected
 #define NUM_ASPECTS   5                                           //  Defines 5 aspects
 #define NUM_LENSES    4
+#define NUM_PINS      9
 
 struct headState                                                 //  headState structure controls the behavior of each head
 {
