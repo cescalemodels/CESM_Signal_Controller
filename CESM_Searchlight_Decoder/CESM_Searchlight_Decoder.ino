@@ -1,4 +1,6 @@
 #include <NmraDcc.h>
+#include <SoftPWM.h>  // Using SoftPWM Library from here: https://github.com/Palatis/arduino-softpwm/ 
+
 #include "CESM_Searchlight_Decoder.h"
 #include "Config.h"
 
@@ -8,34 +10,60 @@ DCC_MSG Packet;
 int fadeTick = 0;
 int pwmTimer = 255;                                         // Counts up to 255 and then resets to 0 in ISR
 int stepLength = 25;                                        // Amount of time between steps
-byte ledInterval[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t AddrSetModeEnabled = 0;
+
 uint8_t FactoryDefaultCVIndex = 0;
 
 uint8_t  commonPole ;
 uint16_t baseAddress ;
 
+SOFTPWM_DEFINE_CHANNEL(0, DDRA, PORTA, PORTA0);
+#ifndef DEBUG
+SOFTPWM_DEFINE_CHANNEL(1, DDRA, PORTA, PORTA1);
+SOFTPWM_DEFINE_CHANNEL(2, DDRA, PORTA, PORTA2);
+#endif
+SOFTPWM_DEFINE_CHANNEL(3, DDRA, PORTA, PORTA3);
+SOFTPWM_DEFINE_CHANNEL(4, DDRA, PORTA, PORTA4);
+SOFTPWM_DEFINE_CHANNEL(5, DDRA, PORTA, PORTA5);
+SOFTPWM_DEFINE_CHANNEL(6, DDRA, PORTA, PORTA6);
+SOFTPWM_DEFINE_CHANNEL(7, DDRA, PORTA, PORTA7);
+SOFTPWM_DEFINE_CHANNEL(8, DDRB, PORTB, PORTB0);
+
+#ifndef DEBUG
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 64);
+#else
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(7, 64);
+#endif
+
+// Because most DCC Command Stations don't support the DCC Accessory Decoder OPS Mode Programming
+// we fake a DCC Mobile Decoder Address for OPS Mode Programming
+#define CV_OPS_MODE_ADDRESS_LSB 33
+
 CVPair FactoryDefaultCVs[] =
 {
   {CV_ACCESSORY_DECODER_ADDRESS_LSB, DEFAULT_ADDRESS},
   {CV_ACCESSORY_DECODER_ADDRESS_MSB, 0},
-
-  {30, 0},          //  Set decoder to common Anode       
+  {CV_OPS_MODE_ADDRESS_LSB,       0x0F},	// 0x270F = 9999 Decimal for OPS Mode Programming
+  {CV_OPS_MODE_ADDRESS_LSB+1,     0x27},
   
-  {38, 255},        //  Red aspect red LED intensity
+  {30, 0},          //  Set decoder to common Anode       
+
+  
+  {38, 63},        //  Red aspect red LED intensity
   {39, 0},          //  Red aspect green LED intensity
   {40, 0},          //  Red aspect blue LED intensity
   
   {41, 0},          //  Green aspect red LED intensity
-  {42, 255},        //  Green aspect green LED intensity
+  {42, 63},        //  Green aspect green LED intensity
   {43, 0},          //  Green aspect blue LED intensity
   
-  {44, 255},        //  Yellow aspect red LED intensity
-  {45, 255},        //  Yellow aspect green LED intensity
+  {44, 63},        //  Yellow aspect red LED intensity
+  {45, 63},        //  Yellow aspect green LED intensity
   {46, 0},          //  Yellow aspect blue LED intensity
   
-  {47, 255},        //  Lunar aspect red LED intensity
-  {48, 255},        //  Lunar aspect green LED intensity
-  {49, 255},        //  Lunar aspect blue LED intensity
+  {47, 63},        //  Lunar aspect red LED intensity
+  {48, 63},        //  Lunar aspect green LED intensity
+  {49, 63},        //  Lunar aspect blue LED intensity
   
   {50, 1},          //  Head A enable/disable fading
   {51, 1},          //  Head B enable/disable fading
@@ -55,31 +83,76 @@ CVPair FactoryDefaultCVs[] =
 
   {66, RED},        //  De-energized solenoid color for all heads (DARK = 0, RED = 1, GREEN = 2, YELLOW = 3, LUNAR = 4)
 
-  {67, 50},         //  Period of flashing for signal head A (0 = disabled, 50 = 1 flash per second, 100 = 2 flash per second)
-  {68, 50},         //  Period of flashing for signal head B (0 = disabled, 50 = 1 flash per second, 100 = 2 flash per second)   
-  {69, 50},         //  Period of flashing for signal head C (0 = disabled, 50 = 1 flash per second, 100 = 2 flash per second)
+  {67, 1},         //  Flashes per second, signal head A (more like number of on and offs per second)
+  {68, 1},         //  Flashes per second, signal head B (more like number of on and offs per second)  
+  {69, 1},         //  Flashes per second, signal head C (more like number of on and offs per second)
 };
 
-void notifyDccSigState( uint16_t Addr, uint8_t headIndex, uint8_t State) //TODO: 0 or 1 based determination for headIndex
+void notifyDccSigOutputState( uint16_t Addr, uint8_t State) //TODO: 0 or 1 based determination for headIndex
 {
+  #ifdef  DEBUG
+  Serial.print(F("notifyDccSigState: Addr: "));
+  Serial.print(Addr);
+  Serial.print(F(" State: "));
+  Serial.println(State);
+  #endif
+  
   if( (Addr < baseAddress) || (Addr >= (baseAddress + NUM_HEADS)))  // Make sure we're only looking at our addresses
+  {
+    #ifdef  DEBUG
+    Serial.println(F("notifyDccSigState: Address out of range"));
+    #endif
+    
     return;
-
+  }
   if( State > NUM_ASPECTS)  // Check we've got a valid Aspect
-    return; 
-  
-  headIndex = Addr - baseAddress; // Compute your own headIndex for now as the library is probably NOT doing the right thing...
+  {
+    #ifdef  DEBUG
+    Serial.println(F("notifyDccSigState: State out of range"));
+    #endif
+    
+    return;
+  }
 
-  headStates[headIndex].currLens = aspectTable[State].lensNumber;
+  uint8_t headIndex = Addr - baseAddress ;
   
-  ledInterval[ headIndex * 3 ] = Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ));
-  ledInterval[ (headIndex * 3) + 1 ] = Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 1);
-  ledInterval[ (headIndex * 3) + 2 ] = Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 2);
+  #ifdef  DEBUG
+  Serial.print(F("notifyDccSigState: Index: "));
+  Serial.println(headIndex);
+  #endif
+ 
+  headStates[headIndex].currLens = aspectTable[State].lensNumber;
+
+  #ifdef DEBUG
+  Palatis::SoftPWM.set( headIndex * 3,      (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES )) );
+  Palatis::SoftPWM.set(( headIndex * 3) + 1, (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 1));
+  Palatis::SoftPWM.set(( headIndex * 3) + 2, (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 2));
+  #endif
   
   headStates[headIndex].prevAspect = headStates[headIndex].currAspect;
   headStates[headIndex].currAspect = State;
   headStates[headIndex].headStatus = STATE_IDLE;
 }
+
+#ifdef  NOTIFY_DCC_MSG
+void notifyDccMsg( DCC_MSG * Msg)
+{
+  #ifdef DEBUG
+  Serial.print(F("notifyDccMsg: ")) ;
+  #endif
+  
+  for(uint8_t i = 0; i < Msg->Size; i++)
+  {
+    #ifdef DEBUG
+    Serial.print(Msg->Data[i], HEX);
+    Serial.write(' ');
+    #endif
+  }
+  #ifdef DEBUG
+  Serial.println();
+  #endif
+}
+#endif
 
 void notifyCVChange( uint16_t CV, uint8_t Value ) 
 {
@@ -95,111 +168,103 @@ void notifyCVChange( uint16_t CV, uint8_t Value )
   }
 }
 
-ISR(TIM0_OVF_vect) 
+void notifyDccAccOutputAddrSet( uint16_t OutputAddr)
 {
-  for(int i = 0; i < NUM_PINS; i++) 
-  {
-    if(ledInterval[i] < pwmTimer)                       //  If the pin's current PWM value is less than 
-    {
-      if(commonPole == 0) 
-      { 
-        digitalWrite(LED_CONTROL_PINS[i], HIGH);    //  Set the current pin to HIGH if the LED is common anode
-      }
-      else 
-      { 
-        digitalWrite(LED_CONTROL_PINS[i], LOW);     //  Set the current pin to LOW if the LED is common cathode
-      }
-    }
-    else                                           
-    {
-      if(commonPole == 0) 
-      { 
-        digitalWrite(LED_CONTROL_PINS[i], LOW);     //  Set the current pin to LOW if the LED is common anode
-      }
-      else 
-      { 
-        digitalWrite(LED_CONTROL_PINS[i], HIGH);    //  Set the current pin to HIGH if the LED is common cathode
-      }
-    }
-  }
-
-  fadeTick++;                                       //  Increment variable that controls whether next fade step is take in the loop.r
-  pwmTimer++;                                       //  Increment the PWM timer variable  
-
-  if(pwmTimer > 255) {                              
-    pwmTimer = 0;                                   //  Reset the PWM timer variable to zero when it gets above 255
-  }
+  #ifdef DEBUG
+  Serial.print(F("notifyDccAccOutputAddrSet Output Addr: "));
+  Serial.println( OutputAddr );
+  #endif
+  
+  baseAddress = Dcc.getAddr();
+  AddrSetModeEnabled = 0;
 }
+
 
 void setup() 
 {
-  for(int i = 0; i < NUM_PINS; i++) {
-    pinMode(LED_CONTROL_PINS[i], OUTPUT);
-  }
-  
+  #ifdef DEBUG
+  Serial.begin(115200);
+  Serial.println(F("\nCESM_Searchlight_Decoder"));
+  #endif
+ 
   pinMode(DCC_READ_PIN, INPUT);
-  pinMode(PROG_JUMPER_PIN, INPUT);
+  pinMode(PROG_JUMPER_PIN, INPUT_PULLUP);
   
-  Dcc.pin(0, DCC_READ_PIN, 1);  // Setup which External Interrupt, the Pin it's associated with that we're using and enable the Pull-Up
-  Dcc.init( MAN_ID_DIY, 10, CV29_ACCESSORY_DECODER | CV29_OUTPUT_ADDRESS_MODE, 0 );
+  Dcc.pin(0, 1, 0);  // Setup which External Interrupt, the Pin it's associated with that we're using and enable the Pull-Up
+  Dcc.init( MAN_ID_DIY, 10, FLAGS_DCC_ACCESSORY_DECODER | FLAGS_OUTPUT_ADDRESS_MODE, CV_OPS_MODE_ADDRESS_LSB );
 
   commonPole = Dcc.getCV(30);
-  baseAddress = Dcc.getAddr();
-
-  bitClear(TCCR0A, COM0A1);
-  bitClear(TCCR0A, COM0A0);
-  bitClear(TCCR0A, COM0B1);
-  bitClear(TCCR0A, COM0B0);
-
-  bitClear(TCCR0A, WGM00);
-  bitClear(TCCR0A, WGM01);
-  bitClear(TCCR0B, WGM02);
-
-  // We need a clock frequency of ~1 millisecond (1000 microseconds) to get a good balance of performance. 
-  // The prescaler needs to be 64 since:|   1/8,000,000  *      1,000,000          *    64     *       255      =       2048 microseconds       |
-  //                                    | Clock freqency | Seconds to Microseconds | Prescaler | 8-bit Overflow | Pretty close to 1 millisecond |
   
-  bitSet(TCCR0B, CS02);
-  bitSet(TCCR0B, CS01);
-  bitClear(TCCR0B, CS00);
+  baseAddress = Dcc.getAddr(); // this is broken for now      TODO: Fix or replace
 
-  bitClear(TIMSK0, OCIE0B);
-  bitClear(TIMSK0, OCIE0A);
-  bitSet(TIMSK0, TOIE0);
+  #ifdef DEBUG
+  Serial.print(F("Base Address: "));
+  Serial.println(baseAddress);
+  #endif
+
+  #ifndef DEBUG
+  Palatis::SoftPWM.begin(60); // begin with 60hz pwm frequency
+  #endif
+
+  #ifdef RESET_CVS_ON_POWER
+  notifyCVResetFactoryDefault(); // Force Restore to Factory Defaults Every time the Decoder is Restarted
+  #endif
 }
 
 void loop() 
 {
-  Dcc.process();
+  Dcc.process();                                                // Read the DCC bus and process the signal. Needs to be called frequently.
 
-  for(int i = 0; i < NUM_HEADS; i++) 
+  for(int headIndex = 0; headIndex < NUM_HEADS; headIndex++) 
   {
-    switch( headStates[i].headStatus )
+    switch( headStates[headIndex].headStatus )
     {
       case STATE_IDLE:
-        
+        Palatis::SoftPWM.set( headIndex * 3,      (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES )) );
+        Palatis::SoftPWM.set(( headIndex * 3) + 1, (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 1));
+        Palatis::SoftPWM.set(( headIndex * 3) + 2, (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 2));
         break;
       case STATE_DIMMING:
-
         break;
       case STATE_BRIGHTENING:
-
         break;
     }
   }
 
-  
   if(fadeTick)
   {  
     fadeTick = 0;
-    
-    
   }
 
   if ( FactoryDefaultCVIndex && Dcc.isSetCVReady()) 
   {
     FactoryDefaultCVIndex--; // Decrement first as initially it is the size of the array
     Dcc.setCV( FactoryDefaultCVs[FactoryDefaultCVIndex].CV, FactoryDefaultCVs[FactoryDefaultCVIndex].Value);
+    #ifdef DEBUG
+    Serial.print(F("FactoryDefault CV: "));
+    Serial.print( FactoryDefaultCVs[FactoryDefaultCVIndex].CV );
+    Serial.print(F("  Value: "));
+    Serial.println( FactoryDefaultCVs[FactoryDefaultCVIndex].Value );
+    #endif
+
+    if(FactoryDefaultCVIndex == 0)
+    {    
+      baseAddress = Dcc.getAddr();
+      #ifdef DEBUG
+      Serial.print(F("Base Address: "));
+      Serial.println(baseAddress);
+      #endif
+    }
+  }
+
+  // Enable Decoder Address Setting from next received Accessory Decoder packet
+  if( !AddrSetModeEnabled && digitalRead(PROG_JUMPER_PIN) == LOW)
+  {
+    #ifdef DEBUG
+    Serial.println(F("Enable DCC Address Set Mode"));
+    #endif
+    AddrSetModeEnabled = 1;
+    Dcc.setAccDecDCCAddrNextReceived(AddrSetModeEnabled);  
   }
 }
 
