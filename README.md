@@ -1,4 +1,4 @@
-## CESM Signal Decoder Code
+## CESM Signal Decoder Code - DEVELOPMENT BRANCH
 
 Signal controller software for CESM searchlight signals. This code will, once it's done being developed, control CESM signal boards in different configurations, depending on the software used. Pleas see www.cescalemodels.com to learn more about our signalling products.
 
