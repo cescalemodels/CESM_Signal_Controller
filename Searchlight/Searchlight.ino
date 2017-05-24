@@ -1,7 +1,7 @@
 #include <NmraDcc.h>
 #include <SoftPWM.h>  // Using SoftPWM Library from here: https://github.com/Palatis/arduino-softpwm/ 
 
-#include "CESM_Searchlight_Decoder.h"
+#include "Searchlight.h"
 #include "Config.h"
 
 NmraDcc Dcc;
