@@ -39,6 +39,8 @@ SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(7, 64);
 // we fake a DCC Mobile Decoder Address for OPS Mode Programming
 #define CV_OPS_MODE_ADDRESS_LSB 33
 
+int on_off = 1;
+
 CVPair FactoryDefaultCVs[] =
 {
   {CV_ACCESSORY_DECODER_ADDRESS_LSB, DEFAULT_ADDRESS},
@@ -48,6 +50,9 @@ CVPair FactoryDefaultCVs[] =
   
   {30, 0},          //  Set decoder to common Anode       
 
+  {35, 0},        //  Dark aspect red LED intensity
+  {36, 0},          //  Dark aspect green LED intensity
+  {37, 0},          //  Dark aspect blue LED intensity
   
   {38, 63},        //  Red aspect red LED intensity
   {39, 0},          //  Red aspect green LED intensity
@@ -122,11 +127,12 @@ void notifyDccSigOutputState( uint16_t Addr, uint8_t State) //TODO: 0 or 1 based
   #endif
  
   headStates[headIndex].currLens = aspectTable[State].lensNumber;
+  on_off = aspectTable[State].on_off;
 
   #ifdef DEBUG
-  Palatis::SoftPWM.set( headIndex * 3,      (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES )) );
-  Palatis::SoftPWM.set(( headIndex * 3) + 1, (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 1));
-  Palatis::SoftPWM.set(( headIndex * 3) + 2, (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 2));
+  Palatis::SoftPWM.set( headIndex * 3,      (uint8_t) Dcc.getCV(35 + ( ( headStates[headIndex].currLens + on_off ) * NUM_LENSES )) );
+  Palatis::SoftPWM.set(( headIndex * 3) + 1, (uint8_t) Dcc.getCV(35 + ( ( headStates[headIndex].currLens + on_off ) * NUM_LENSES ) + 1));
+  Palatis::SoftPWM.set(( headIndex * 3) + 2, (uint8_t) Dcc.getCV(35 + ( ( headStates[headIndex].currLens + on_off ) * NUM_LENSES ) + 2));
   #endif
   
   headStates[headIndex].prevAspect = headStates[headIndex].currAspect;
@@ -220,9 +226,9 @@ void loop()
     switch( headStates[headIndex].headStatus )
     {
       case STATE_IDLE:
-        Palatis::SoftPWM.set( headIndex * 3,      (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES )) );
-        Palatis::SoftPWM.set(( headIndex * 3) + 1, (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 1));
-        Palatis::SoftPWM.set(( headIndex * 3) + 2, (uint8_t) Dcc.getCV(38 + ( headStates[headIndex].currLens * NUM_LENSES ) + 2));
+        Palatis::SoftPWM.set( headIndex * 3,      ( uint8_t ) Dcc.getCV(35 + ( ( headStates[headIndex].currLens + on_off ) * NUM_LENSES ) ) );
+        Palatis::SoftPWM.set(( headIndex * 3 ) + 1, ( uint8_t ) Dcc.getCV(35 + ( ( headStates[headIndex].currLens + on_off ) * NUM_LENSES ) + 1 ) );
+        Palatis::SoftPWM.set(( headIndex * 3 ) + 2, ( uint8_t ) Dcc.getCV(35 + ( ( headStates[headIndex].currLens + on_off ) * NUM_LENSES ) + 2 ) );
         break;
       case STATE_DIMMING:
         break;
