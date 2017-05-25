@@ -45,8 +45,8 @@ CVPair FactoryDefaultCVs[] =
 {
   {CV_ACCESSORY_DECODER_ADDRESS_LSB, DEFAULT_ADDRESS},
   {CV_ACCESSORY_DECODER_ADDRESS_MSB, 0},
-  {CV_OPS_MODE_ADDRESS_LSB,       0x0F},	// 0x270F = 9999 Decimal for OPS Mode Programming
-  {CV_OPS_MODE_ADDRESS_LSB+1,     0x27},
+  {CV_OPS_MODE_ADDRESS_LSB,       0xB8},	// 0x22B8 = 8888 Decimal for OPS Mode Programming  // 0x270F = 9999 Decimal for OPS Mode Programming
+  {CV_OPS_MODE_ADDRESS_LSB+1,     0x22},
   
   {30, 0},          //  Set decoder to common Anode       
 
