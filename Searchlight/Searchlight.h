@@ -26,6 +26,7 @@ byte  lensArrangement[] = {GREEN, RED, YELLOW, LUNAR};
 #define STATE_SIMUL         3
 
 #define NUM_HEADS     3                                           //  Defines 3 heads on signal decoder if the searchlight configuration is selected
+#define NUM_LED_PER_HEAD  3
 #define NUM_ASPECTS   9                                           //  Defines 5 aspects
 #define NUM_LENSES    4
 #define NUM_PINS      9
@@ -48,7 +49,7 @@ struct aspectInfo
 };
 
 #define OFF -1                 // Turns head off
-#define ON 1                  // Turns head on
+#define ON 0                  // Turns head on
 
 #define NO_EFFECT 0            // No special effect
 #define EFFECT_ON 1           // Vane movement effect
@@ -67,7 +68,7 @@ aspectInfo aspectTable[NUM_ASPECTS] =
   {2, ON, EFFECT_ON_FLASHING},      // Aspect 5 is lens 2 (yellow) with a flashing (always) vane (if enabled) effect
   {0, ON, EFFECT_ON_FLASHING},      // Aspect 6 is lens 0 (green) with a flashing (always) vane (if enabled) effect
   {3, ON, EFFECT_ON_FLASHING},      // Aspect 7 is lens 3 (lunar) with a flashing (always) vane (if enabled) effect
-  {0, OFF, NO_EFFECT}                      // Aspect 8 is dark
+  {0, OFF, NO_EFFECT}               // Aspect 8 is dark
 };
 
 headState headStates[3];
