@@ -48,8 +48,13 @@ struct aspectInfo
   byte    effect;
 };
 
+<<<<<<< HEAD
 #define OFF -1                 // Turns head off
 #define ON 0                  // Turns head on
+=======
+#define OFF 0                // Turns head off
+#define ON  1                  // Turns head on
+>>>>>>> 41ee96a6c8fe9ebfa8b084af9f6cd39bf10af3c8
 
 #define NO_EFFECT 0            // No special effect
 #define EFFECT_ON 1           // Vane movement effect

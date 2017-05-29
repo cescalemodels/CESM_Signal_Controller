@@ -1,4 +1,11 @@
 
+<<<<<<< HEAD
+=======
+#define DEBUG
+
+#include "Searchlight.h"
+#include "Config.h"
+>>>>>>> 41ee96a6c8fe9ebfa8b084af9f6cd39bf10af3c8
 
 #include <NmraDcc.h>                                                  //  Include the NMRADcc library from Alex Shepard
 #include <SoftPWM.h>                                                  //  Include SoftPWM library from here: https://github.com/Palatis/arduino-softpwm/ 
@@ -43,8 +50,8 @@ CVPair FactoryDefaultCVs[] =
 {
   {CV_ACCESSORY_DECODER_ADDRESS_LSB, DEFAULT_ADDRESS},
   {CV_ACCESSORY_DECODER_ADDRESS_MSB, 0},
-  {CV_OPS_MODE_ADDRESS_LSB,       0xB8},	// 0x22B8 = 8888 Decimal for OPS Mode Programming  // 0x270F = 9999 Decimal for OPS Mode Programming
-  {CV_OPS_MODE_ADDRESS_LSB+1,     0x22},
+  {CV_OPS_MODE_ADDRESS_LSB,       0x01},	// 0x22B8 = 8888 Decimal for OPS Mode Programming  // 0x270F = 9999 Decimal for OPS Mode Programming
+  {CV_OPS_MODE_ADDRESS_LSB+1,     0x00},
   
   {30, 0},          //  Set decoder to common Anode       
 
@@ -160,6 +167,13 @@ void notifyDccMsg( DCC_MSG * Msg )
 
 void notifyCVChange( uint16_t CV, uint8_t Value ) 
 {
+  #ifdef DEBUG
+  Serial.print(F("notifyCVChange CV: "));
+  Serial.print( CV );
+  Serial.print(F(" Value: "));
+  Serial.println( Value );
+  #endif
+  
   switch(CV)
   {
     case CV_ACCESSORY_DECODER_ADDRESS_LSB:
@@ -176,15 +190,23 @@ void notifyDccAccOutputAddrSet( uint16_t OutputAddr)
 {
   #ifdef DEBUG
   Serial.print(F("notifyDccAccOutputAddrSet Output Addr: "));
-  Serial.println( OutputAddr );
+  Serial.print( OutputAddr );
   #endif
   
+  Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB,     OutputAddr & 0x00FF);
+  Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB + 1, (OutputAddr >> 8) & 0x00FF);
+
   baseAddress = Dcc.getAddr();
   
   Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB,     OutputAddr & 0x00FF);
   Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB + 1, (OutputAddr >> 8) & 0x00FF);
   
   AddrSetModeEnabled = 0;
+  
+  #ifdef DEBUG
+  Serial.print(F(" baseAddress: "));
+  Serial.println( baseAddress );
+  #endif    
 }
 
 void setup() 
@@ -271,6 +293,15 @@ void loop()
     Serial.println(F("Enable DCC Address Set Mode"));
     #endif
     AddrSetModeEnabled = 1;
+    Dcc.setAccDecDCCAddrNextReceived(AddrSetModeEnabled);  
+  }
+
+  if( AddrSetModeEnabled && digitalRead(PROG_JUMPER_PIN) == HIGH)
+  {
+    #ifdef DEBUG
+    Serial.println(F("Disable DCC Address Set Mode"));
+    #endif
+    AddrSetModeEnabled = 0;
     Dcc.setAccDecDCCAddrNextReceived(AddrSetModeEnabled);  
   }
 }
