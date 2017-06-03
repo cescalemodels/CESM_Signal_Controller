@@ -5,7 +5,12 @@ COPYRIGHT (C) 2017 David J. Cutting, Alex Shepard
 
 **********************************************************************/
 
-#define DEBUG                                                         //  Uncomment this line to enable serial ouutput on lines 2 and 3
+#define DEBUG
+//#define NOTIFY_DCC_MSG
+#define DEFAULT_ADDRESS 40
+
+#define DCC_READ_PIN        PIN_B1                                //  Pin number for the pin that reads the DCC signal
+#define PROG_JUMPER_PIN     PIN_B2                                //  Pin number that detects if decoder is in programming mode
 
 #define PROG_JUMPER_PIN     PIN_B2
 
@@ -26,20 +31,17 @@ uint8_t AddrSetModeEnabled = 0;                                       //  Keeps 
 uint8_t FactoryDefaultCVIndex = 0;                                    //  Controls reset of the decoder
 uint8_t commonPole;                                                   //  Keeps track of whether the decoder is set up as common anode or common cathode based on CVs
 
-SOFTPWM_DEFINE_CHANNEL(0, DDRA, PORTA, PORTA0);                       //  Initiates softpwm channel 0
-SOFTPWM_DEFINE_CHANNEL(3, DDRA, PORTA, PORTA3);                       //  Initiates softpwm channel 3
-SOFTPWM_DEFINE_CHANNEL(4, DDRA, PORTA, PORTA4);                       //  Initiates softpwm channel 4
-SOFTPWM_DEFINE_CHANNEL(5, DDRA, PORTA, PORTA5);                       //  Initiates softpwm channel 5
-SOFTPWM_DEFINE_CHANNEL(6, DDRA, PORTA, PORTA6);                       //  Initiates softpwm channel 6
-SOFTPWM_DEFINE_CHANNEL(7, DDRA, PORTA, PORTA7);                       //  Initiates softpwm channel 7
-SOFTPWM_DEFINE_CHANNEL(8, DDRB, PORTB, PORTB0);                       //  Initiates softpwm channel 8
-
 #ifndef DEBUG
-SOFTPWM_DEFINE_CHANNEL(1, DDRA, PORTA, PORTA1);                       //  Initiates softpwm channel 1
-SOFTPWM_DEFINE_CHANNEL(2, DDRA, PORTA, PORTA2);                       //  Initiates softpwm channel 2
-SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 64);                         //  Sets up 9 channels of softpwm with 64 levels
-#else
-SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(7, 64);                         //  Sets up 7 channels of softpwm with 64 levels
+SOFTPWM_DEFINE_CHANNEL(0, DDRA, PORTA, PORTA0);
+SOFTPWM_DEFINE_CHANNEL(1, DDRA, PORTA, PORTA1);
+SOFTPWM_DEFINE_CHANNEL(2, DDRA, PORTA, PORTA2);
+SOFTPWM_DEFINE_CHANNEL(3, DDRA, PORTA, PORTA3);
+SOFTPWM_DEFINE_CHANNEL(4, DDRA, PORTA, PORTA4);
+SOFTPWM_DEFINE_CHANNEL(5, DDRA, PORTA, PORTA5);
+SOFTPWM_DEFINE_CHANNEL(6, DDRA, PORTA, PORTA6);
+SOFTPWM_DEFINE_CHANNEL(7, DDRA, PORTA, PORTA7);
+SOFTPWM_DEFINE_CHANNEL(8, DDRB, PORTB, PORTB0);
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 64);
 #endif
 
 #define CV_OPS_MODE_ADDRESS_LSB 33                                    //  Because most DCC Command Stations don't support the DCC Accessory Decoder OPS Mode programming,
@@ -197,20 +199,17 @@ void notifyDccAccOutputAddrSet( uint16_t OutputAddr )
 {
   #ifdef DEBUG
   Serial.print(F("notifyDccAccOutputAddrSet Output Addr: "));
-  Serial.print( OutputAddr );
+  Serial.println( OutputAddr );
   #endif
+  
+  baseAddress = Dcc.getAddr();
   
   Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB,     OutputAddr & 0x00FF);
   Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB + 1, (OutputAddr >> 8) & 0x00FF);
-
-  baseAddress = Dcc.getAddr();
-  AddrSetModeEnabled = 0;
   
-  #ifdef DEBUG
-  Serial.print(F(" baseAddress: "));
-  Serial.println( baseAddress );
-  #endif 
+  AddrSetModeEnabled = 0;
 }
+
 
 void setup() 
 {
@@ -247,7 +246,8 @@ void loop()
 {
   Dcc.process();                                                // Read the DCC bus and process the signal. Needs to be called frequently.
 
-  for( int headIndex = 0; headIndex < NUM_HEADS; headIndex++ ) 
+  #ifndef DEBUG
+  for(int headIndex = 0; headIndex < NUM_HEADS; headIndex++) 
   {
     switch( headStates[headIndex].headStatus )
     {
@@ -262,7 +262,7 @@ void loop()
         break;
     }
   }
-
+  
   if ( FactoryDefaultCVIndex && Dcc.isSetCVReady()) 
   {
     FactoryDefaultCVIndex--; // Decrement first as initially it is the size of the array
