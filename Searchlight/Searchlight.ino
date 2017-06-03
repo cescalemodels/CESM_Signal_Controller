@@ -7,6 +7,8 @@ COPYRIGHT (C) 2017 David J. Cutting, Alex Shepard
 
 #define DEBUG                                                         //  Uncomment this line to enable serial ouutput on lines 2 and 3
 
+#define PROG_JUMPER_PIN     PIN_B2
+
 #include "Searchlight.h"                                              //  Include the Searchlight header file
 #include "Config.h"                                                   //  Include the Configuration header file
 
@@ -46,7 +48,7 @@ SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(7, 64);                         //  Sets u
 CVPair FactoryDefaultCVs[] =
 {
   {CV_ACCESSORY_DECODER_ADDRESS_LSB, DEFAULT_ADDRESS},                //  Set the accessory decoder address
-  {CV_ACCESSORY_DECODER_ADDRESS_MSB, 0},                              //  Set the mobile decoder address for ops mode programming
+  {CV_ACCESSORY_DECODER_ADDRESS_MSB, 0},                             
   
   {CV_OPS_MODE_ADDRESS_LSB,       0x01},	                            
   {CV_OPS_MODE_ADDRESS_LSB+1,     0x00},
@@ -179,7 +181,7 @@ void notifyCVChange( uint16_t CV, uint8_t Value )                     //  Runs i
   Serial.println( Value );
   #endif
   
-  switch(CV)
+  switch(CV)                                                          //  Changes the locally stored (not EEPROM) values of the CVs if one changes.
   {
     case CV_ACCESSORY_DECODER_ADDRESS_LSB:
     case CV_ACCESSORY_DECODER_ADDRESS_MSB:
@@ -191,7 +193,7 @@ void notifyCVChange( uint16_t CV, uint8_t Value )                     //  Runs i
   }
 }
 
-void notifyDccAccOutputAddrSet( uint16_t OutputAddr)
+void notifyDccAccOutputAddrSet( uint16_t OutputAddr )
 {
   #ifdef DEBUG
   Serial.print(F("notifyDccAccOutputAddrSet Output Addr: "));
@@ -202,16 +204,12 @@ void notifyDccAccOutputAddrSet( uint16_t OutputAddr)
   Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB + 1, (OutputAddr >> 8) & 0x00FF);
 
   baseAddress = Dcc.getAddr();
-  
-  Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB,     OutputAddr & 0x00FF);
-  Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB + 1, (OutputAddr >> 8) & 0x00FF);
-  
   AddrSetModeEnabled = 0;
   
   #ifdef DEBUG
   Serial.print(F(" baseAddress: "));
   Serial.println( baseAddress );
-  #endif    
+  #endif 
 }
 
 void setup() 
@@ -263,11 +261,6 @@ void loop()
       case STATE_BRIGHTENING:
         break;
     }
-  }
-
-  if(fadeTick)
-  {  
-    fadeTick = 0;
   }
 
   if ( FactoryDefaultCVIndex && Dcc.isSetCVReady()) 
