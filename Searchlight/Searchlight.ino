@@ -2,6 +2,11 @@
 #include <SoftPWM.h>  // Using SoftPWM Library from here: https://github.com/Palatis/arduino-softpwm/ 
 
 #define DEBUG
+//#define NOTIFY_DCC_MSG
+#define DEFAULT_ADDRESS 40
+
+#define DCC_READ_PIN        PIN_B1                                //  Pin number for the pin that reads the DCC signal
+#define PROG_JUMPER_PIN     PIN_B2                                //  Pin number that detects if decoder is in programming mode
 
 #include "Searchlight.h"
 #include "Config.h"
@@ -19,19 +24,16 @@ uint8_t FactoryDefaultCVIndex = 0;
 uint8_t  commonPole ;
 uint16_t baseAddress ;
 
-SOFTPWM_DEFINE_CHANNEL(0, DDRA, PORTA, PORTA0);
 #ifndef DEBUG
+SOFTPWM_DEFINE_CHANNEL(0, DDRA, PORTA, PORTA0);
 SOFTPWM_DEFINE_CHANNEL(1, DDRA, PORTA, PORTA1);
 SOFTPWM_DEFINE_CHANNEL(2, DDRA, PORTA, PORTA2);
-#endif
 SOFTPWM_DEFINE_CHANNEL(3, DDRA, PORTA, PORTA3);
 SOFTPWM_DEFINE_CHANNEL(4, DDRA, PORTA, PORTA4);
 SOFTPWM_DEFINE_CHANNEL(5, DDRA, PORTA, PORTA5);
 SOFTPWM_DEFINE_CHANNEL(6, DDRA, PORTA, PORTA6);
 SOFTPWM_DEFINE_CHANNEL(7, DDRA, PORTA, PORTA7);
 SOFTPWM_DEFINE_CHANNEL(8, DDRB, PORTB, PORTB0);
-
-#ifndef DEBUG
 SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 64);
 #else
 SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(7, 64);
@@ -187,20 +189,17 @@ void notifyDccAccOutputAddrSet( uint16_t OutputAddr)
 {
   #ifdef DEBUG
   Serial.print(F("notifyDccAccOutputAddrSet Output Addr: "));
-  Serial.print( OutputAddr );
+  Serial.println( OutputAddr );
   #endif
+  
+  baseAddress = Dcc.getAddr();
   
   Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB,     OutputAddr & 0x00FF);
   Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB + 1, (OutputAddr >> 8) & 0x00FF);
-
-  baseAddress = Dcc.getAddr();
-  AddrSetModeEnabled = 0;
   
-  #ifdef DEBUG
-  Serial.print(F(" baseAddress: "));
-  Serial.println( baseAddress );
-  #endif    
+  AddrSetModeEnabled = 0;
 }
+
 
 void setup() 
 {
@@ -237,6 +236,7 @@ void loop()
 {
   Dcc.process();                                                // Read the DCC bus and process the signal. Needs to be called frequently.
 
+  #ifndef DEBUG
   for(int headIndex = 0; headIndex < NUM_HEADS; headIndex++) 
   {
     switch( headStates[headIndex].headStatus )
@@ -257,6 +257,7 @@ void loop()
   {  
     fadeTick = 0;
   }
+  #endif
 
   if ( FactoryDefaultCVIndex && Dcc.isSetCVReady()) 
   {

@@ -7,11 +7,6 @@ COPYRIGHT (C) 2017 David J. Cutting
 
 #include "Config.h"
 
-const int LED_CONTROL_PINS[9] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_A6, PIN_A7, PIN_B0};
-
-#define DCC_READ_PIN        PIN_B1                                //  Pin number for the pin that reads the DCC signal
-#define PROG_JUMPER_PIN     PIN_B2                                //  Pin number that detects if decoder is in programming mode
-
 #define RED     1                                              
 #define YELLOW  3                                           
 #define GREEN   2                                              
