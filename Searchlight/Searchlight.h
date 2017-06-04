@@ -158,4 +158,9 @@ aspectInfo aspectTable[ NUM_ASPECTS ] =
   {BLACK,   OFF,  NO_EFFECT}                                          // Aspect 8 is dark
 };
 
-
+typedef enum
+{
+  ADDR_SET_DISABLED = 0,
+  ADDR_SET_DONE,
+  ADDR_SET_ENABLED
+} ADDR_SET_MODE;
