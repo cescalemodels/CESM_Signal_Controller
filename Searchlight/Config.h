@@ -18,7 +18,7 @@ COPYRIGHT (C) 2017 David J. Cutting, Alex Shepard
 //  Enable serial debug to print messages to the serial line, and disable all LEDs
 //  Enable light debugging which will disable all special effects.
 
-#define SERIAL_DEBUG
+//#define SERIAL_DEBUG
 //#define LIGHT_DEBUG
 
 //////////////////////////////////////////////////////////////////////////////////////

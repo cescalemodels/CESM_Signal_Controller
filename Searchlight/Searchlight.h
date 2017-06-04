@@ -31,7 +31,6 @@ DCC_MSG Packet;                                                       //  Create
 
 #define STATE_IDLE          0                                         //  Idle state ID for switch case
 #define STATE_DIMMING       1                                         //  Dimming ID for switch case
-#define STATE_BRIGHTENING   2                                         //  Brightening ID for switch case
 
 #define OFF 0                                                         //  Defines off as 0
 #define ON  1                                                         //  Defines on as 1
@@ -56,8 +55,8 @@ CVPair FactoryDefaultCVs[] =
   {CV_ACCESSORY_DECODER_ADDRESS_LSB, DEFAULT_ADDRESS},                //  Set the accessory decoder address
   {CV_ACCESSORY_DECODER_ADDRESS_MSB, 0},                             
   
-  {CV_OPS_MODE_ADDRESS_LSB,       0x01},                              //  Set the OPS mode programming address
-  {CV_OPS_MODE_ADDRESS_LSB+1,     0x00},
+  {CV_OPS_MODE_ADDRESS_LSB,DEFAULT_ADDRESS},                          //  Set the OPS mode programming address
+  {CV_OPS_MODE_ADDRESS_LSB+1, 0},
   
   {30, 0},                                                            //  Polarity for all heads - 0 = Common Anode, 1 = Common Cathode      
 
@@ -106,6 +105,22 @@ CVPair FactoryDefaultCVs[] =
 
 byte  lensArrangement[] = {GREEN, RED, YELLOW, LUNAR};                //  Defines which order colors are arranged on vane (2, 1, 3, 4)
 
+struct colorInfo
+{
+  byte    red;
+  byte    grn;
+  byte    blu;
+};
+
+colorInfo colorCache[ NUM_COLORS ] =
+{
+  {Dcc.getCV(35), Dcc.getCV(36), Dcc.getCV(37)},
+  {Dcc.getCV(38), Dcc.getCV(39), Dcc.getCV(40)},
+  {Dcc.getCV(41), Dcc.getCV(42), Dcc.getCV(43)},
+  {Dcc.getCV(44), Dcc.getCV(45), Dcc.getCV(46)},
+  {Dcc.getCV(47), Dcc.getCV(48), Dcc.getCV(49)},
+};
+
 struct headState                                                      //  headState structure controls the behavior of each head
 {
   byte    prevAspect = RED;                                           //  Color from last command
@@ -117,6 +132,8 @@ struct headState                                                      //  headSt
   byte    currLens = lensArrangement[RED];
 
   byte    on_off = ON;
+
+  colorInfo currBlend = colorCache[1];
 };   
 
 headState headStates[3];
@@ -141,18 +158,4 @@ aspectInfo aspectTable[ NUM_ASPECTS ] =
   {BLACK,   OFF,  NO_EFFECT}                                          // Aspect 8 is dark
 };
 
-struct colorInfo
-{
-  byte    red;
-  byte    grn;
-  byte    blu;
-};
 
-colorInfo colorCache[ NUM_COLORS ] =
-{
-  {Dcc.getCV(35), Dcc.getCV(36), Dcc.getCV(37)},
-  {Dcc.getCV(38), Dcc.getCV(39), Dcc.getCV(40)},
-  {Dcc.getCV(41), Dcc.getCV(42), Dcc.getCV(43)},
-  {Dcc.getCV(44), Dcc.getCV(45), Dcc.getCV(46)},
-  {Dcc.getCV(47), Dcc.getCV(48), Dcc.getCV(49)},
-};

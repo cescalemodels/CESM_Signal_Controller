@@ -12,9 +12,12 @@ COPYRIGHT (C) 2017 David J. Cutting, Alex Shepard
 #define PROG_JUMPER_PIN PIN_B2                                        //  Pin number that detects if decoder is in programming mode
 
 int fadeTick = 0;                                                     //  Counter variable that times the dimming of the signal            
-int stepLength = 25;                                                  //  Sets amount of time (microseconds) between dimming steps
+#define FADE_STEP_LENGTH 25                                               //  Sets amount of time (milliseconds) between dimming steps
+int brightTime;                                                       //  Brightness timer
+byte brightCounter;
+#define FADE_STEPS 20
 
-uint16_t baseAddress = 40;                                            //  Keeps track of the base address of the decoder
+uint16_t baseAddress;                                            //  Keeps track of the base address of the decoder
 uint8_t AddrSetModeEnabled = 0;                                       //  Keeps track of whether the programming jumper is set
 uint8_t FactoryDefaultCVIndex = 0;                                    //  Controls reset of the decoder
 uint8_t commonPole;                                                   //  Keeps track of whether the decoder is set up as common anode or common cathode based on CVs
@@ -69,12 +72,14 @@ void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifi
 
   uint8_t headIndex = Addr - baseAddress ;                            //  Determines which head we're talking about (0, 1, 2, ...)
 
+  #ifndef SERIAL_DEBUG
   headStates[headIndex].prevAspect = headStates[headIndex].currAspect;//  Stores the old aspect in the aspect archive
   headStates[headIndex].currAspect = State;                           //  Stores the state in the current aspect  
   headStates[headIndex].headStatus = STATE_IDLE;                      //  Sets the status to idle (not dimming or brightening)
   headStates[headIndex].currLens = aspectTable[State].lensNumber;     //  Looks up the lens number in the aspect table, stores to head info table.
   headStates[headIndex].on_off = aspectTable[State].on_off;           //  Looks up whether the aspect is on or off, stores to head info table
   headStates[headIndex].effect = aspectTable[State].effect;           //  Looks up the aspect effect and stores it to head info table
+  #endif
 
   #ifdef SERIAL_DEBUG
   Serial.print( F( "notifyDccSigState: Index: " ) );
@@ -161,22 +166,22 @@ void notifyDccAccOutputAddrSet( uint16_t OutputAddr )
 
 void setup() 
 {
+  pinMode(DCC_READ_PIN, INPUT);
+  pinMode(PROG_JUMPER_PIN, INPUT);
+  
+  Dcc.pin( 0, DCC_READ_PIN, 0 );  // Setup which External Interrupt, the Pin it's associated with that we're using and enable the Pull-Up
+  Dcc.init( MAN_ID_DIY, 10, FLAGS_DCC_ACCESSORY_DECODER | FLAGS_OUTPUT_ADDRESS_MODE, CV_OPS_MODE_ADDRESS_LSB );
+  
+  baseAddress = Dcc.getAddr();
+  
   #ifdef SERIAL_DEBUG
   Serial.begin( 115200 );
   Serial.println(F("\nCESM_Searchlight_Decoder"));
   Serial.print(F("Base Address: "));
   Serial.println(baseAddress);
   #endif
- 
-  pinMode(DCC_READ_PIN, INPUT);
-  pinMode(PROG_JUMPER_PIN, INPUT);
-  
-  Dcc.pin( 0, DCC_READ_PIN, 0 );  // Setup which External Interrupt, the Pin it's associated with that we're using and enable the Pull-Up
-  Dcc.init( MAN_ID_DIY, 10, FLAGS_DCC_ACCESSORY_DECODER | FLAGS_OUTPUT_ADDRESS_MODE, CV_OPS_MODE_ADDRESS_LSB );
 
   commonPole = Dcc.getCV(30);
-  
-  baseAddress = Dcc.getAddr(); // this is broken for now      TODO: Fix or replace
 
   #ifndef SERIAL_DEBUG
   Palatis::SoftPWM.begin(60); // begin with 60hz pwm frequency
@@ -185,23 +190,77 @@ void setup()
   #ifdef RESET_CVS_ON_POWER
   notifyCVResetFactoryDefault(); // Force Restore to Factory Defaults Every time the Decoder is Restarted
   #endif
+
+  brightTime = micros() + FADE_STEP_LENGTH;
 }
 
 void loop() 
 {
   Dcc.process();                                                // Read the DCC bus and process the signal. Needs to be called frequently.
 
+  uint8_t isItTime = 0;
+  
+  if( micros() >= brightTime )
+  {
+    isItTime = 1;
+    brightTime = millis() + FADE_STEP_LENGTH;          
+  }
+
   #if !defined( SERIAL_DEBUG ) && !defined( LIGHT_DEBUG )
   for(int headIndex = 0; headIndex < NUM_HEADS; headIndex++) 
-  {
+  { 
     switch( headStates[headIndex].headStatus )
     {
       case STATE_IDLE:
+          if( ( abs( headStates[headIndex].currBlend.red - colorCache[headStates[headIndex].currAspect].red ) > 5 ) ||
+              ( abs( headStates[headIndex].currBlend.grn - colorCache[headStates[headIndex].currAspect].grn ) > 5 ) ||
+              ( abs( headStates[headIndex].currBlend.blu - colorCache[headStates[headIndex].currAspect].blu ) > 5 ) )
+          {
+            headStates[headIndex].headStatus = STATE_DIMMING;
+          }
+        break;
         
-        break;
       case STATE_DIMMING:
-        break;
-      case STATE_BRIGHTENING:
+        if(isItTime) {
+          brightCounter++;
+          if(brightCounter > FADE_STEPS)
+          {
+            brightCounter = 0;
+          }
+
+          int test = 0;
+          
+          if( abs( headStates[headIndex].currBlend.red - colorCache[headStates[headIndex].currAspect].red ) > 5 )
+          {
+            headStates[headIndex].currBlend.red += (byte) (( colorCache[headStates[headIndex].currAspect].red -                
+            colorCache[headStates[headIndex].prevAspect].red ) / ( brightTime * FADE_STEP_LENGTH ) * brightCounter );
+            
+            test++;
+          }
+
+          if( abs( headStates[headIndex].currBlend.grn - colorCache[headStates[headIndex].currAspect].grn ) > 5 )
+          {
+            headStates[headIndex].currBlend.grn += (byte) (( colorCache[headStates[headIndex].currAspect].grn -                
+            colorCache[headStates[headIndex].prevAspect].grn ) / ( brightTime * FADE_STEP_LENGTH ) * brightCounter );
+            
+            test++;
+          }
+          
+          if( abs( headStates[headIndex].currBlend.blu - colorCache[headStates[headIndex].currAspect].blu ) > 5 )
+          {
+            headStates[headIndex].currBlend.blu += (byte) (( colorCache[headStates[headIndex].currAspect].blu -                
+            colorCache[headStates[headIndex].prevAspect].blu ) / ( brightTime * FADE_STEP_LENGTH ) * brightCounter );
+            
+            test++;
+          }
+          
+          if( !test )
+          {
+            return;
+          }
+          
+          setSoftPWMValues(headIndex, headStates[headIndex].currBlend.red, headStates[headIndex].currBlend.grn, headStates[headIndex].currBlend.blu );
+        }
         break;
     }
   }
