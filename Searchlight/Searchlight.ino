@@ -198,6 +198,7 @@ void loop()
 {
   Dcc.process();                                                // Read the DCC bus and process the signal. Needs to be called frequently.
 
+  /*
   uint8_t isItTime = 0;
   
   if( micros() >= brightTime )
@@ -205,7 +206,8 @@ void loop()
     isItTime = 1;
     brightTime = millis() + FADE_STEP_LENGTH;          
   }
-
+  
+  
   #if !defined( SERIAL_DEBUG ) && !defined( LIGHT_DEBUG )
   for(int headIndex = 0; headIndex < NUM_HEADS; headIndex++) 
   { 
@@ -265,6 +267,7 @@ void loop()
     }
   }
   #endif
+  */
   
   if ( FactoryDefaultCVIndex && Dcc.isSetCVReady()) 
   {
