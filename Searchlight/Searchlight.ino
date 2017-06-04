@@ -18,7 +18,7 @@ byte brightCounter;
 #define FADE_STEPS 20
 
 uint16_t baseAddress;                                            //  Keeps track of the base address of the decoder
-uint8_t AddrSetModeEnabled = 0;                                       //  Keeps track of whether the programming jumper is set
+ADDR_SET_MODE AddrSetMode = ADDR_SET_DISABLED ;                                       //  Keeps track of whether the programming jumper is set
 uint8_t FactoryDefaultCVIndex = 0;                                    //  Controls reset of the decoder
 uint8_t commonPole;                                                   //  Keeps track of whether the decoder is set up as common anode or common cathode based on CVs
 
@@ -160,7 +160,7 @@ void notifyDccAccOutputAddrSet( uint16_t OutputAddr )
   Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB,     OutputAddr & 0x00FF);
   Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB + 1, (OutputAddr >> 8) & 0x00FF);
   
-  AddrSetModeEnabled = 0;
+  AddrSetMode = ADDR_SET_DONE;
 }
 
 
@@ -291,27 +291,39 @@ void loop()
   }
 
   // Enable Decoder Address Setting from next received Accessory Decoder packet
-  if( !AddrSetModeEnabled && digitalRead(PROG_JUMPER_PIN) == LOW)
+  switch(AddrSetMode)
   {
-    #ifdef SERIAL_DEBUG
-    Serial.println(F("Enable DCC Address Set Mode"));
-    #endif
-    AddrSetModeEnabled = 1;
-    Dcc.setAccDecDCCAddrNextReceived(AddrSetModeEnabled);  
-  }
+  case ADDR_SET_DISABLED:
+    if(digitalRead(PROG_JUMPER_PIN) == LOW)
+    {
+      #ifdef SERIAL_DEBUG
+      Serial.println(F("Enable DCC Address Set Mode"));
+      #endif
+      AddrSetMode = ADDR_SET_ENABLED;
+      Dcc.setAccDecDCCAddrNextReceived(1);  
+    }
+    break;
 
-  if( AddrSetModeEnabled && digitalRead(PROG_JUMPER_PIN) == HIGH)
-  {
-    #ifdef SERIAL_DEBUG
-    Serial.println(F("Disable DCC Address Set Mode"));
-    #endif
-    AddrSetModeEnabled = 0;
-    Dcc.setAccDecDCCAddrNextReceived(AddrSetModeEnabled);  
+  default:
+    if(digitalRead(PROG_JUMPER_PIN) == HIGH)
+    {
+      #ifdef SERIAL_DEBUG
+      Serial.println(F("Disable DCC Address Set Mode"));
+      #endif
+      if(AddrSetMode == ADDR_SET_ENABLED)
+        Dcc.setAccDecDCCAddrNextReceived(0);
+          
+      AddrSetMode = ADDR_SET_DISABLED;
+    }
   }
 }
 
 void notifyCVResetFactoryDefault()
 {
+  #ifdef SERIAL_DEBUG
+  Serial.println(F("notifyCVResetFactoryDefault"));
+  #endif
+
   FactoryDefaultCVIndex = sizeof(FactoryDefaultCVs) / sizeof(CVPair); // Make FactoryDefaultCVIndex non-zero and equal to num CV's to be reset
                                                                       // to flag to the loop() function that a reset to Factory Defaults needs 
                                                                       // to be done
