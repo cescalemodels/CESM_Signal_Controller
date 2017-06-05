@@ -1,48 +1,102 @@
 /**********************************************************************
 
-Searchlight.ino
-COPYRIGHT (C) 2017 David J. Cutting, Alex Shepard
+Searchlight Driver Code
+COPYRIGHT (C) 2017 David J. Cutting
+
+Special thanks to Alex Shepard for his work on this code. Without his
+    help this project wouldn't have been possible.
+
+Special thanks to Mike Weber, who graciously provided his wonderful 
+    BLMA searchlight driver code, which was heavily modified and
+    integrated into this code.
 
 **********************************************************************/
 
-#include "Searchlight.h"                                              //  Include the Searchlight header file
-#include "Config.h"                                                   //  Include the Configuration header file
+/////////////////////////////////////
+//  INCLUDE REQUIRED HEADER FILES  //
+/////////////////////////////////////
 
-#define DCC_READ_PIN  PIN_B1                                          //  Pin number for the pin that reads the DCC signal
-#define PROG_JUMPER_PIN PIN_B2                                        //  Pin number that detects if decoder is in programming mode
+#include "Searchlight.h"                                              //  Include the Searchlight header file
+#include "BoardDefine.h"                                              //  Include the header file that defines the pin numbers, etc.
+#include "Config.h"                                                   //  Include the configuration header file
+
+/////////////////////////////////////
+//  SET UP EFFECT TIMER VARIABLES  //
+///////////////////////////////////// 
 
 int fadeTick = 0;                                                     //  Counter variable that times the dimming of the signal            
-#define FADE_STEP_LENGTH 25                                               //  Sets amount of time (milliseconds) between dimming steps
+#define FADE_STEP_LENGTH 25                                           //  Sets amount of time (milliseconds) between dimming steps
 int brightTime;                                                       //  Brightness timer
 byte brightCounter;
 #define FADE_STEPS 20
+#define ANIMATE_DELAY_TIME 20
 
-uint16_t baseAddress;                                            //  Keeps track of the base address of the decoder
-ADDR_SET_MODE AddrSetMode = ADDR_SET_DISABLED ;                                       //  Keeps track of whether the programming jumper is set
+////////////////////////////
+//  SET UP DCC VARIABLES  //
+//////////////////////////// 
+
+ADDR_SET_MODE AddrSetMode = ADDR_SET_DISABLED ;                       //  Keeps track of whether the programming jumper is set
+
+uint16_t baseAddress;                                                 //  Keeps track of the base address of the decoder
 uint8_t FactoryDefaultCVIndex = 0;                                    //  Controls reset of the decoder
-uint8_t commonPole;                                                   //  Keeps track of whether the decoder is set up as common anode or common cathode based on CVs
+uint8_t commonPole;                                                   //  Keeps track of whether the decoder is set up as common anode or common cathode
 
-#ifndef SERIAL_DEBUG                                                         
-SOFTPWM_DEFINE_CHANNEL(0, DDRA, PORTA, PORTA0);                       //  Creates soft PWM channel 0 on Port A0 (Pin 1)
-SOFTPWM_DEFINE_CHANNEL(1, DDRA, PORTA, PORTA1);                       //  Creates soft PWM channel 1 on Port A1 (Pin 2)
-SOFTPWM_DEFINE_CHANNEL(2, DDRA, PORTA, PORTA2);                       //  Creates soft PWM channel 2 on Port A2 (Pin 3)
-SOFTPWM_DEFINE_CHANNEL(3, DDRA, PORTA, PORTA3);                       //  Creates soft PWM channel 3 on Port A3 (Pin 4)
-SOFTPWM_DEFINE_CHANNEL(4, DDRA, PORTA, PORTA4);                       //  Creates soft PWM channel 4 on Port A4 (Pin 5)
-SOFTPWM_DEFINE_CHANNEL(5, DDRA, PORTA, PORTA5);                       //  Creates soft PWM channel 5 on Port A5 (Pin 6)
-SOFTPWM_DEFINE_CHANNEL(6, DDRA, PORTA, PORTA6);                       //  Creates soft PWM channel 6 on Port A6 (Pin 7)
-SOFTPWM_DEFINE_CHANNEL(7, DDRA, PORTA, PORTA7);                       //  Creates soft PWM channel 7 on Port A7 (Pin 8)
-SOFTPWM_DEFINE_CHANNEL(8, DDRB, PORTB, PORTB0);                       //  Creates soft PWM channel 8 on Port B0 (Pin 9)
-SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 64);                         //  Defines the 9 soft PWM channels with 64 step resolution
-#endif
+/////////////
+//  SETUP  //
+/////////////
 
-#ifndef SERIAL_DEBUG
+void setup() 
+{
+  pinMode(DCC_READ_PIN, INPUT);                                       //  Set the DCC read pin as an input
+  pinMode(PROG_JUMPER_PIN, INPUT_PULLUP);                             //  Set the Programming jumper input as an input and enable its pullup resistor
+  
+  Dcc.pin( 0, DCC_READ_PIN, 0 );                                      //  Setup which External Interrupt, the Pin it's associated with, and
+                                                                      //  that we're using and enable the Pull-Up
+
+  Dcc.init( MAN_ID, 10, FLAGS_DCC_ACCESSORY_DECODER | FLAGS_OUTPUT_ADDRESS_MODE, CV_OPS_MODE_ADDRESS_LSB );   //  Initialize the DCC interface. Set the 
+                                                                      //  manufacturer ID to the one set in Config.h, set the CV29 flags, and set the 
+                                                                      //  operations mode address.
+  
+  baseAddress = Dcc.getAddr();                                        //  Preload the decoder address
+  commonPole = Dcc.getCV(30);                                         //  Preload commonpole variable
+  
+  #ifdef SERIAL_DEBUG
+  Serial.begin( 115200 );                                             //  Start the serial line at a baud rate of 115200
+  Serial.println(F("\nCESM_Searchlight_Decoder"));
+  Serial.print(F("Base Address: "));
+  Serial.println(baseAddress);
+  #endif
+
+  #ifndef SERIAL_DEBUG
+  Palatis::SoftPWM.begin(60);                                         //  Begin soft PWM with 60hz pwm frequency
+  #endif
+
+  #ifdef RESET_CVS_ON_POWER
+  notifyCVResetFactoryDefault();                                      //  Force Restore to Factory Defaults Every time the Decoder is Restarted (enable in config)
+  #endif
+}
+
+/////////////////////////////////
+//  SOFT PWM SETTING FUNCTION  //
+/////////////////////////////////
+
 void setSoftPWMValues( uint8_t headNumber, uint8_t redVal, uint8_t grnVal, uint8_t bluVal )  //  Sets the PWM values of each LED in a certain head
-{                                                                   
+{          
+  //  Functions that set the soft PWM values based on the requested value and the common pole variable                                                         
   Palatis::SoftPWM.set(   headNumber * 3      , (uint8_t) abs( redVal - ( 63 * commonPole ) ) );
   Palatis::SoftPWM.set( ( headNumber * 3 ) + 1, (uint8_t) abs( grnVal - ( 63 * commonPole ) ) );
   Palatis::SoftPWM.set( ( headNumber * 3 ) + 2, (uint8_t) abs( bluVal - ( 63 * commonPole ) ) );
+
+  //  Update the head states with the current values of the LEDs
+  headStates[headNumber].currBlend.red = redVal;
+  headStates[headNumber].currBlend.grn = grnVal;
+  headStates[headNumber].currBlend.blu = bluVal;
 }
-#endif
+
+
+///////////////////////////////////////////
+//  DCC SIGNAL PACKET DECODING FUNCTION  //
+///////////////////////////////////////////
 
 void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifies program of an incoming signal packet
 {
@@ -91,8 +145,8 @@ void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifi
   #endif
 }
 
-#if defined( NOTIFY_DCC_MSG ) && defined( SERIAL_DEBUG )                                             
-void notifyDccMsg( DCC_MSG * Msg )                                    //  Prints all DCC packets to serial line
+#ifdef  SERIAL_DEBUG_NOTIFY_DCC_MSG                                            
+void notifyDccMsg( DCC_MSG * Msg )                                    //  Prints all DCC packets to serial line (enable in Config.h)
 {
   Serial.print( F( "notifyDccMsg: " ) );
   for( uint8_t i = 0; i < Msg->Size; i++ )
@@ -164,41 +218,12 @@ void notifyDccAccOutputAddrSet( uint16_t OutputAddr )
 }
 
 
-void setup() 
-{
-  pinMode(DCC_READ_PIN, INPUT);
-  pinMode(PROG_JUMPER_PIN, INPUT);
-  
-  Dcc.pin( 0, DCC_READ_PIN, 0 );  // Setup which External Interrupt, the Pin it's associated with that we're using and enable the Pull-Up
-  Dcc.init( MAN_ID_DIY, 10, FLAGS_DCC_ACCESSORY_DECODER | FLAGS_OUTPUT_ADDRESS_MODE, CV_OPS_MODE_ADDRESS_LSB );
-  
-  baseAddress = Dcc.getAddr();
-  
-  #ifdef SERIAL_DEBUG
-  Serial.begin( 115200 );
-  Serial.println(F("\nCESM_Searchlight_Decoder"));
-  Serial.print(F("Base Address: "));
-  Serial.println(baseAddress);
-  #endif
 
-  commonPole = Dcc.getCV(30);
-
-  #ifndef SERIAL_DEBUG
-  Palatis::SoftPWM.begin(60); // begin with 60hz pwm frequency
-  #endif
-
-  #ifdef RESET_CVS_ON_POWER
-  notifyCVResetFactoryDefault(); // Force Restore to Factory Defaults Every time the Decoder is Restarted
-  #endif
-
-  brightTime = micros() + FADE_STEP_LENGTH;
-}
 
 void loop() 
 {
   Dcc.process();                                                // Read the DCC bus and process the signal. Needs to be called frequently.
 
-  /*
   uint8_t isItTime = 0;
   
   if( micros() >= brightTime )
@@ -211,6 +236,100 @@ void loop()
   #if !defined( SERIAL_DEBUG ) && !defined( LIGHT_DEBUG )
   for(int headIndex = 0; headIndex < NUM_HEADS; headIndex++) 
   { 
+    if (headStates[headIndex].inputStabilizeCount < 60)
+    {                               
+      headStates[headIndex].inputStabilizeCount ++;                                 //  Make sure both inputs are stable before calculating requests
+    }
+
+    
+    if( headStates[headIndex].headStatus == STATE_IDLE )              //  Check if head is actively animating.
+    {            
+      if( millis() - headStates[headIndex].lastAnimateTime >= ANIMATE_DELAY_TIME ) //  And check if it's time to fire off the next frame of animation (every 20ms)
+      {
+        switch (headStates[headIndex].currAspect) 
+        {
+          case RED:                                                   //  If the head is actually red...
+            switch (headStates[headIndex].nextAspect) {
+              case RED:                                               //  See what is requested and select the proper animation function.
+                RedYellow();                                          //  ...and so on
+                break;
+              case GREEN:
+                RedGreen();
+                break;
+              case BLACK:
+                RedDark();
+                break;
+            }
+            break;
+          case YELLOW:
+            switch (A_request) {
+              case RED:
+                YellowRed();
+                break;
+              case GREEN:
+                YellowGreen();
+                break;
+              case BLACK:
+                YellowDark();
+                break;
+            }
+            break;
+          case GREEN:
+            switch (A_request) {
+              case RED:
+                A_GreenRed();
+                break;
+              case YELLOW:
+                A_GreenYellow();
+                break;
+              case BLACK:
+                A_GreenDark();
+                break;
+            }
+            break;
+          case BLACK:
+            switch (A_request) {
+            case RED:
+              A_DarkRed();
+              break;
+            case YELLOW:
+              A_DarkYellow();
+              break;
+            case GREEN:
+              A_DarkGreen();
+              break;
+            }
+            break;
+        }
+      }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
     switch( headStates[headIndex].headStatus )
     {
       case STATE_IDLE:

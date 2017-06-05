@@ -1,36 +1,47 @@
 /**********************************************************************
 
-Config.h
-COPYRIGHT (C) 2017 David J. Cutting, Alex Shepard
+Searchlight Driver Code
+COPYRIGHT (C) 2017 David J. Cutting
 
-***********************************************************************/
+Special thanks to Alex Shepard for his work on this code. Without his
+    help this project wouldn't have been possible.
 
-//////////////////////////////////////////////////////////////////////////////////////
-//
-//  Choose the manufacturer ID for the decoder (default: 10 (NMRA DIY ID number))
+Special thanks to Mike Weber, who graciously provided his wonderful 
+    BLMA searchlight driver code, which was heavily modified and
+    integrated into this code.
 
-#define MFG_ID  10
+**********************************************************************/
 
-//////////////////////////////////////////////////////////////////////////////////////
-//
-//  Choose ONE:
-//
-//  Enable serial debug to print messages to the serial line, and disable all LEDs
-//  Enable light debugging which will disable all special effects.
-
-//#define SERIAL_DEBUG
-//#define LIGHT_DEBUG
-
-//////////////////////////////////////////////////////////////////////////////////////
-//
-//  Enable printing of all DCC messages by uncommenting this line and the one above 
-
-//#define NOTIFY_DCC_MSG
+#include <NmraDcc.h>                                                  //  You must use the branch available here: https://github.com/mrrwa/NmraDcc/tree/AddOutputModeAddressing
 
 //////////////////////////////////////////////////////////////////////////////////////
 //
 //  Set default address for the decoder that it assumes upon reset.
 
 #define DEFAULT_ADDRESS 40
+
+//////////////////////////////////////////////////////////////////////////////////////
+//
+//  Debug - Choose ONE:
+//
+//  Enable serial debug to print messages to the serial line, and disable all LEDs
+//  Enable light debugging which will disable all special effects.
+//  Enable serial debug, print all recieved DCC packets to serial line (no other debug messages)
+
+//#define SERIAL_DEBUG
+//#define LIGHT_DEBUG
+//#define SERIAL_DEBUG_NOTIFY_DCC_MSG
+
+//////////////////////////////////////////////////////////////////////////////////////
+//
+//  Force Restore to Factory Defaults Every time the Decoder is Restarted
+
+//#define RESET_CVS_ON_POWER
+
+//////////////////////////////////////////////////////////////////////////////////////
+//
+//  Define Manufacturer ID (default is 10
+
+#define MAN_ID  MAN_ID_DIY
 
 //////////////////////////////////////////////////////////////////////////////////////

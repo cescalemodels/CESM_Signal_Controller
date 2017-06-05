@@ -1,20 +1,40 @@
 /**********************************************************************
 
-Searchlight.h
-COPYRIGHT (C) 2017 David J. Cutting, Alex Shepard
+Searchlight Driver Code
+COPYRIGHT (C) 2017 David J. Cutting
+
+Special thanks to Alex Shepard for his work on this code. Without his
+    help this project wouldn't have been possible.
+
+Special thanks to Mike Weber, who graciously provided his wonderful 
+    BLMA searchlight driver code, which was heavily modified and
+    integrated into this code.
 
 **********************************************************************/
 
+///////////////////////////
+//  INCLUDE HEADER FILE  //
+///////////////////////////
+
 #include "Config.h"
 
-#include <NmraDcc.h>
+//////////////////////////////////
+//  INCLUDE REQUIRED LIBRARIES  //
+//////////////////////////////////
+
+#include <NmraDcc.h>                                                  //  You must use the branch available here: https://github.com/mrrwa/NmraDcc/tree/AddOutputModeAddressing
 #include <SoftPWM.h>                                                  //  Include SoftPWM library from here: https://github.com/Palatis/arduino-softpwm/ 
+
+//////////////////////////
+//  CREATE DCC OBJECTS  //
+//////////////////////////
 
 NmraDcc Dcc;                                                          //  Create an NmraDcc object named Dcc
 DCC_MSG Packet;                                                       //  Create a DCC_MSG object named Packet
 
-#define DCC_READ_PIN        PIN_B1                                    //  Pin number for the pin that reads the DCC signal
-#define PROG_JUMPER_PIN     PIN_B2                                    //  Pin number that detects if decoder is in programming mode
+////////////////////////////////////
+//  SET UP SIGNAL HEAD CONSTANTS  //
+////////////////////////////////////
 
 #define NUM_HEADS         3                                           //  Defines 3 heads on signal decoder if the searchlight configuration is selected
 #define NUM_LED_PER_HEAD  3                                           //  Defines 3 LEDs in each signal head
@@ -30,7 +50,7 @@ DCC_MSG Packet;                                                       //  Create
 #define LUNAR   4                                                     //  Lunar color ID                                       
 
 #define STATE_IDLE          0                                         //  Idle state ID for switch case
-#define STATE_DIMMING       1                                         //  Dimming ID for switch case
+#define STATE_EFFECT        1                                         //  Dimming ID for switch case
 
 #define OFF 0                                                         //  Defines off as 0
 #define ON  1                                                         //  Defines on as 1
@@ -125,6 +145,7 @@ struct headState                                                      //  headSt
 {
   byte    prevAspect = RED;                                           //  Color from last command
   byte    currAspect = RED;                                           //  Color from current command
+  byte    nextAspect = RED;                                           //  Color from next command
   
   byte    headStatus = STATE_IDLE;
   byte    effect = NO_EFFECT;                                         
@@ -134,6 +155,9 @@ struct headState                                                      //  headSt
   byte    on_off = ON;
 
   colorInfo currBlend = colorCache[1];
+
+  int     inputStabilizeCount = 0;
+  int     lastAnimateTime = 0;
 };   
 
 headState headStates[3];
