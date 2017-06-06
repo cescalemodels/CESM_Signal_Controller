@@ -32,6 +32,8 @@ Special thanks to Mike Weber, who graciously provided his wonderful
 //#define LIGHT_DEBUG
 //#define SERIAL_DEBUG_NOTIFY_DCC_MSG
 
+#define DEBUG_BAUD_RATE 115200
+
 //////////////////////////////////////////////////////////////////////////////////////
 //
 //  Force Restore to Factory Defaults Every time the Decoder is Restarted

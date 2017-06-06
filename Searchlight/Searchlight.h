@@ -47,10 +47,16 @@ DCC_MSG Packet;                                                       //  Create
 #define RED     1                                                     //  Red color ID                                        
 #define GREEN   2                                                     //  Green color ID
 #define YELLOW  3                                                     //  Yellow color ID
-#define LUNAR   4                                                     //  Lunar color ID                                       
+#define LUNAR   4                                                     //  Lunar color ID   
+
+#define LENS_GREEN 0
+#define LENS_RED 1
+#define LENS_YELLOW 2
+#define LENS_LUNAR 3
 
 #define STATE_IDLE          0                                         //  Idle state ID for switch case
-#define STATE_EFFECT        1                                         //  Dimming ID for switch case
+#define STATE_ANIMATE       1                                         //  Dimming ID for switch case
+#define STATE_ANIMATE_BLACK 2                                         //  ID for case where animation is being switched and signal is black momentarily
 
 #define OFF 0                                                         //  Defines off as 0
 #define ON  1                                                         //  Defines on as 1
@@ -123,10 +129,17 @@ CVPair FactoryDefaultCVs[] =
   {69, 1},                                                            //  Flashes per second, signal head C
 };
 
-byte  lensArrangement[] = {GREEN, RED, YELLOW, LUNAR};                //  Defines which order colors are arranged on vane (2, 1, 3, 4)
+
+// The following four lists define the intensities of the colors at different points along the animation. They scale from 0 to 63.
+const byte bypassColor[] = {6, 22, 47, 62, 49, 15, 5, 0};
+const byte leaveColor[] = {61, 57, 49, 38, 27, 10, 33, 47, 38, 16, 11, 0};
+const byte stopAtEnergized[] = {6, 14, 20, 27, 36, 49, 60, 63, 63, 51, 26, 38, 49, 57, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 47, 38, 44, 57, 63};
+const byte stopAtNonEnergized[] = {1, 4, 12, 32, 37, 44, 54, 63, 63, 63, 63, 63, 63, 63, 63, 63, 57, 52, 42, 28, 19, 6, 6, 10, 14, 21, 
+                                       28, 36, 44, 55, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 57, 53, 47, 41, 32, 28, 35, 42, 49, 55, 63};
 
 struct colorInfo
 {
+  byte    vanePos;
   byte    red;
   byte    grn;
   byte    blu;
@@ -134,30 +147,29 @@ struct colorInfo
 
 colorInfo colorCache[ NUM_COLORS ] =
 {
-  {Dcc.getCV(35), Dcc.getCV(36), Dcc.getCV(37)},
-  {Dcc.getCV(38), Dcc.getCV(39), Dcc.getCV(40)},
-  {Dcc.getCV(41), Dcc.getCV(42), Dcc.getCV(43)},
-  {Dcc.getCV(44), Dcc.getCV(45), Dcc.getCV(46)},
-  {Dcc.getCV(47), Dcc.getCV(48), Dcc.getCV(49)},
+  {0, Dcc.getCV(35), Dcc.getCV(36), Dcc.getCV(37)},  // Black
+  {1, Dcc.getCV(38), Dcc.getCV(39), Dcc.getCV(40)},  // Red
+  {0, Dcc.getCV(41), Dcc.getCV(42), Dcc.getCV(43)},  // Green
+  {2, Dcc.getCV(44), Dcc.getCV(45), Dcc.getCV(46)},  // Yellow
+  {3, Dcc.getCV(47), Dcc.getCV(48), Dcc.getCV(49)},  // Lunar
 };
+
+const byte vaneOrder[] = {GREEN, RED, YELLOW, LUNAR};
 
 struct headState                                                      //  headState structure controls the behavior of each head
 {
-  byte    prevAspect = RED;                                           //  Color from last command
-  byte    currAspect = RED;                                           //  Color from current command
-  byte    nextAspect = RED;                                           //  Color from next command
+  byte    startColor = RED;                                           //  Color of the signal when command was recieved from DCC system
+  byte    currColor = RED;                                            //  Color of the aspect in animation
+  byte    nextColor = RED;                                            //  Color that is being targeted
   
   byte    headStatus = STATE_IDLE;
   byte    effect = NO_EFFECT;                                         
 
-  byte    currLens = lensArrangement[RED];
-
-  byte    on_off = ON;
-
-  colorInfo currBlend = colorCache[1];
+  colorInfo currLens = colorCache[RED];
 
   int     inputStabilizeCount = 0;
   int     lastAnimateTime = 0;
+  int     frame = 0;
 };   
 
 headState headStates[3];
@@ -188,3 +200,66 @@ typedef enum
   ADDR_SET_DONE,
   ADDR_SET_ENABLED
 } ADDR_SET_MODE;
+
+
+
+void leaveColorFunc( uint8_t headNumber, byte colorToLeave )
+{
+  if(headStates[headNumber].frame < 12)
+  {
+    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToLeave].red / 63, 
+                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToLeave].grn / 63, 
+                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToLeave].blu / 63 );
+    headStates[headNumber].frame ++;
+    headStates[headNumber].lastAnimateTime = millis();
+    return;
+  }
+  headStates[headIndex].headStatus = STATE_IDLE;
+  headStates[headIndex].tempColor = DARK;
+  frame = 0;
+}
+
+void bypassColorFunc( uint8_t headNumber, byte colorToPass) {
+  if(headStates[headNumber].frame < 8) 
+  {
+    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToPass].red / 63, 
+                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToPass].grn / 63, 
+                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToPass].blu / 63 );
+    headStates[headNumber].frame ++;
+    headStates[headNumber].lastAnimateTime = millis();
+    return;
+  }
+  headStates[headIndex].headStatus = STATE_IDLE;
+  headStates[headIndex].tempColor = DARK;
+  frame = 0;
+}
+
+void stopAtEnergizedFunc( uint8_t headNumber, byte colorToStopAt ) {
+  if(headStates[headNumber].frame < 33) 
+  {
+    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].red / 63, 
+                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].grn / 63, 
+                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].blu / 63 );
+    headStates[headNumber].frame ++;
+    headStates[headNumber].lastAnimateTime = millis();
+    return;
+  }
+  headStates[headIndex].headStatus = STATE_IDLE;
+  headStates[headIndex].tempColor = DARK;
+  frame = 0;
+}
+
+void stopAtDeEnergizedFunc( uint8_t headNumber, byte colorToStopAt=RED ) {
+  if(headStates[headNumber].frame < 52) 
+  {
+    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].red / 63, 
+                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].grn / 63, 
+                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].blu / 63 );
+    headStates[headNumber].frame ++;
+    headStates[headNumber].lastAnimateTime = millis();
+    return;
+  }
+  headStates[headIndex].headStatus = STATE_IDLE;
+  headStates[headIndex].tempColor = DARK;
+  frame = 0;
+}

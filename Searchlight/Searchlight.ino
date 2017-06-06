@@ -30,6 +30,9 @@ int brightTime;                                                       //  Bright
 byte brightCounter;
 #define FADE_STEPS 20
 #define ANIMATE_DELAY_TIME 20
+unsigned long animateTimer[NUM_HEADS] = {0, 0, 0};
+unsigned long animateTimerHead1 = 0;
+unsigned long animateTimerHead2 = 0; 
 
 ////////////////////////////
 //  SET UP DCC VARIABLES  //
@@ -61,7 +64,7 @@ void setup()
   commonPole = Dcc.getCV(30);                                         //  Preload commonpole variable
   
   #ifdef SERIAL_DEBUG
-  Serial.begin( 115200 );                                             //  Start the serial line at a baud rate of 115200
+  Serial.begin( DEBUG_BAUD_RATE );                                    //  Start the serial line at baud rate specified in Config.h
   Serial.println(F("\nCESM_Searchlight_Decoder"));
   Serial.print(F("Base Address: "));
   Serial.println(baseAddress);
@@ -72,8 +75,90 @@ void setup()
   #endif
 
   #ifdef RESET_CVS_ON_POWER
-  notifyCVResetFactoryDefault();                                      //  Force Restore to Factory Defaults Every time the Decoder is Restarted (enable in config)
+  notifyCVResetFactoryDefault();                                      //  Force Restore to factory defaults whenever decoder is restarted (enable in config)
   #endif
+}
+
+/////////////////////////
+//  CV RESET FUNCTION  //
+/////////////////////////
+
+void notifyCVResetFactoryDefault()
+{
+  #ifdef SERIAL_DEBUG
+  Serial.println(F("notifyCVResetFactoryDefault"));
+  #endif
+
+  FactoryDefaultCVIndex = sizeof(FactoryDefaultCVs) / sizeof(CVPair); //  Make FactoryDefaultCVIndex non-zero and equal to num CV's to be reset
+                                                                      //  to flag to the loop() function that a reset to Factory Defaults needs 
+                                                                      //  to be done
+};
+
+//////////////////////////////////////////////////////////////
+//  CV PROGRAMMING FUNCTION - Runs if a CV value is change  //
+//////////////////////////////////////////////////////////////
+
+void notifyCVChange( uint16_t CV, uint8_t Value )
+{
+  #ifdef SERIAL_DEBUG
+  Serial.print(F("notifyCVChange CV: "));
+  Serial.print( CV );
+  Serial.print(F(" Value: "));
+  Serial.println( Value );
+  #endif
+  
+  switch(CV)                                                          //  Changes the locally stored (not EEPROM) values of the CVs if one changes.
+  {
+    case CV_ACCESSORY_DECODER_ADDRESS_LSB:
+      break;
+    case CV_ACCESSORY_DECODER_ADDRESS_MSB:
+      baseAddress = Dcc.getAddr();
+      break;
+    case 30:
+      commonPole = Value;
+      break;
+  }
+  if( ( CV >= 35 ) && ( CV <= 49 ) )
+  {
+    uint8_t CVindex = CV - 35;
+    uint8_t row = 0;
+    while( CVindex >= 3 ) 
+    {
+      CVindex -= 3;
+      row++;
+    }
+    if( CVindex == 0 )
+    {
+      colorCache[row].red = Value;
+    }
+    else if( CVindex == 1 )
+    {
+      colorCache[row].grn = Value;
+    }
+    else if( CVindex == 2 )
+    {
+      colorCache[row].blu = Value;
+    }
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////
+//  ADDRESS PROGRAMMING FUNCTION - Runs from loop while jumper is set  //
+/////////////////////////////////////////////////////////////////////////
+
+void notifyDccAccOutputAddrSet( uint16_t OutputAddr )
+{
+  #ifdef SERIAL_DEBUG
+  Serial.print(F("notifyDccAccOutputAddrSet Output Addr: "));
+  Serial.println( OutputAddr );
+  #endif
+  
+  baseAddress = Dcc.getAddr();
+  
+  Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB,     OutputAddr & 0x00FF);
+  Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB + 1, (OutputAddr >> 8) & 0x00FF);
+  
+  AddrSetMode = ADDR_SET_DONE;
 }
 
 /////////////////////////////////
@@ -127,10 +212,9 @@ void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifi
   uint8_t headIndex = Addr - baseAddress ;                            //  Determines which head we're talking about (0, 1, 2, ...)
 
   #ifndef SERIAL_DEBUG
-  headStates[headIndex].prevAspect = headStates[headIndex].currAspect;//  Stores the old aspect in the aspect archive
-  headStates[headIndex].currAspect = State;                           //  Stores the state in the current aspect  
+  headStates[headIndex].currColor = State;                           //  Stores the state in the current aspect  
   headStates[headIndex].headStatus = STATE_IDLE;                      //  Sets the status to idle (not dimming or brightening)
-  headStates[headIndex].currLens = aspectTable[State].lensNumber;     //  Looks up the lens number in the aspect table, stores to head info table.
+  headStates[headIndex].currColor = aspectTable[State].lensNumber;     //  Looks up the lens number in the aspect table, stores to head info table.
   headStates[headIndex].on_off = aspectTable[State].on_off;           //  Looks up whether the aspect is on or off, stores to head info table
   headStates[headIndex].effect = aspectTable[State].effect;           //  Looks up the aspect effect and stores it to head info table
   #endif
@@ -141,7 +225,7 @@ void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifi
   #endif
 
   #ifdef LIGHT_DEBUG
-  setSoftPWMValues( headIndex, colorCache[headStates[headIndex].currLens].red, colorCache[headStates[headIndex].currLens].grn, colorCache[headStates[headIndex].currLens].blu ); 
+  setSoftPWMValues( headIndex, colorCache[headStates[headIndex].currColor].red, colorCache[headStates[headIndex].currColor].grn, colorCache[headStates[headIndex].currColor].blu ); 
   #endif
 }
 
@@ -158,236 +242,18 @@ void notifyDccMsg( DCC_MSG * Msg )                                    //  Prints
 }
 #endif
 
-void notifyCVChange( uint16_t CV, uint8_t Value )                     //  Runs if a CV value is changed
-{
-  #ifdef SERIAL_DEBUG
-  Serial.print(F("notifyCVChange CV: "));
-  Serial.print( CV );
-  Serial.print(F(" Value: "));
-  Serial.println( Value );
-  #endif
-  
-  switch(CV)                                                          //  Changes the locally stored (not EEPROM) values of the CVs if one changes.
-  {
-    case CV_ACCESSORY_DECODER_ADDRESS_LSB:
-      break;
-    case CV_ACCESSORY_DECODER_ADDRESS_MSB:
-      baseAddress = Dcc.getAddr();
-      break;
-    case 30:
-      commonPole = Value;
-      break;
-  }
-  if( ( CV >= 35 ) && ( CV <= 49 ) )
-  {
-    uint8_t CVindex = CV - 35;
-    uint8_t row = 0;
-    while( CVindex >= 3 ) 
-    {
-      CVindex -= 3;
-      row++;
-    }
-    if( CVindex == 0 )
-    {
-      colorCache[row].red = Value;
-    }
-    else if( CVindex == 1 )
-    {
-      colorCache[row].grn = Value;
-    }
-    else if( CVindex == 2 )
-    {
-      colorCache[row].blu = Value;
-    }
-  }
-}
-
-void notifyDccAccOutputAddrSet( uint16_t OutputAddr )
-{
-  #ifdef SERIAL_DEBUG
-  Serial.print(F("notifyDccAccOutputAddrSet Output Addr: "));
-  Serial.println( OutputAddr );
-  #endif
-  
-  baseAddress = Dcc.getAddr();
-  
-  Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB,     OutputAddr & 0x00FF);
-  Dcc.setCV(CV_OPS_MODE_ADDRESS_LSB + 1, (OutputAddr >> 8) & 0x00FF);
-  
-  AddrSetMode = ADDR_SET_DONE;
-}
-
-
-
+/////////////////
+//  MAIN LOOP  //
+/////////////////
 
 void loop() 
 {
-  Dcc.process();                                                // Read the DCC bus and process the signal. Needs to be called frequently.
+  Dcc.process();                                                //  Read the DCC bus and process the signal. Needs to be called frequently.
 
-  uint8_t isItTime = 0;
-  
-  if( micros() >= brightTime )
-  {
-    isItTime = 1;
-    brightTime = millis() + FADE_STEP_LENGTH;          
-  }
-  
-  
-  #if !defined( SERIAL_DEBUG ) && !defined( LIGHT_DEBUG )
-  for(int headIndex = 0; headIndex < NUM_HEADS; headIndex++) 
-  { 
-    if (headStates[headIndex].inputStabilizeCount < 60)
-    {                               
-      headStates[headIndex].inputStabilizeCount ++;                                 //  Make sure both inputs are stable before calculating requests
-    }
+  ////////////////////////////
+  //  RESET ALL CV TRIGGER  //
+  ////////////////////////////
 
-    
-    if( headStates[headIndex].headStatus == STATE_IDLE )              //  Check if head is actively animating.
-    {            
-      if( millis() - headStates[headIndex].lastAnimateTime >= ANIMATE_DELAY_TIME ) //  And check if it's time to fire off the next frame of animation (every 20ms)
-      {
-        switch (headStates[headIndex].currAspect) 
-        {
-          case RED:                                                   //  If the head is actually red...
-            switch (headStates[headIndex].nextAspect) {
-              case RED:                                               //  See what is requested and select the proper animation function.
-                RedYellow();                                          //  ...and so on
-                break;
-              case GREEN:
-                RedGreen();
-                break;
-              case BLACK:
-                RedDark();
-                break;
-            }
-            break;
-          case YELLOW:
-            switch (A_request) {
-              case RED:
-                YellowRed();
-                break;
-              case GREEN:
-                YellowGreen();
-                break;
-              case BLACK:
-                YellowDark();
-                break;
-            }
-            break;
-          case GREEN:
-            switch (A_request) {
-              case RED:
-                A_GreenRed();
-                break;
-              case YELLOW:
-                A_GreenYellow();
-                break;
-              case BLACK:
-                A_GreenDark();
-                break;
-            }
-            break;
-          case BLACK:
-            switch (A_request) {
-            case RED:
-              A_DarkRed();
-              break;
-            case YELLOW:
-              A_DarkYellow();
-              break;
-            case GREEN:
-              A_DarkGreen();
-              break;
-            }
-            break;
-        }
-      }
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    switch( headStates[headIndex].headStatus )
-    {
-      case STATE_IDLE:
-          if( ( abs( headStates[headIndex].currBlend.red - colorCache[headStates[headIndex].currAspect].red ) > 5 ) ||
-              ( abs( headStates[headIndex].currBlend.grn - colorCache[headStates[headIndex].currAspect].grn ) > 5 ) ||
-              ( abs( headStates[headIndex].currBlend.blu - colorCache[headStates[headIndex].currAspect].blu ) > 5 ) )
-          {
-            headStates[headIndex].headStatus = STATE_DIMMING;
-          }
-        break;
-        
-      case STATE_DIMMING:
-        if(isItTime) {
-          brightCounter++;
-          if(brightCounter > FADE_STEPS)
-          {
-            brightCounter = 0;
-          }
-
-          int test = 0;
-          
-          if( abs( headStates[headIndex].currBlend.red - colorCache[headStates[headIndex].currAspect].red ) > 5 )
-          {
-            headStates[headIndex].currBlend.red += (byte) (( colorCache[headStates[headIndex].currAspect].red -                
-            colorCache[headStates[headIndex].prevAspect].red ) / ( brightTime * FADE_STEP_LENGTH ) * brightCounter );
-            
-            test++;
-          }
-
-          if( abs( headStates[headIndex].currBlend.grn - colorCache[headStates[headIndex].currAspect].grn ) > 5 )
-          {
-            headStates[headIndex].currBlend.grn += (byte) (( colorCache[headStates[headIndex].currAspect].grn -                
-            colorCache[headStates[headIndex].prevAspect].grn ) / ( brightTime * FADE_STEP_LENGTH ) * brightCounter );
-            
-            test++;
-          }
-          
-          if( abs( headStates[headIndex].currBlend.blu - colorCache[headStates[headIndex].currAspect].blu ) > 5 )
-          {
-            headStates[headIndex].currBlend.blu += (byte) (( colorCache[headStates[headIndex].currAspect].blu -                
-            colorCache[headStates[headIndex].prevAspect].blu ) / ( brightTime * FADE_STEP_LENGTH ) * brightCounter );
-            
-            test++;
-          }
-          
-          if( !test )
-          {
-            return;
-          }
-          
-          setSoftPWMValues(headIndex, headStates[headIndex].currBlend.red, headStates[headIndex].currBlend.grn, headStates[headIndex].currBlend.blu );
-        }
-        break;
-    }
-  }
-  #endif
-  */
-  
   if ( FactoryDefaultCVIndex && Dcc.isSetCVReady()) 
   {
     FactoryDefaultCVIndex--; // Decrement first as initially it is the size of the array
@@ -409,41 +275,91 @@ void loop()
     }
   }
 
-  // Enable Decoder Address Setting from next received Accessory Decoder packet
-  switch(AddrSetMode)
-  {
-  case ADDR_SET_DISABLED:
-    if(digitalRead(PROG_JUMPER_PIN) == LOW)
-    {
-      #ifdef SERIAL_DEBUG
-      Serial.println(F("Enable DCC Address Set Mode"));
-      #endif
-      AddrSetMode = ADDR_SET_ENABLED;
-      Dcc.setAccDecDCCAddrNextReceived(1);  
-    }
-    break;
+  ///////////////////////////
+  //  ADDRESS SET TRIGGER  //
+  ///////////////////////////
 
-  default:
-    if(digitalRead(PROG_JUMPER_PIN) == HIGH)
-    {
-      #ifdef SERIAL_DEBUG
-      Serial.println(F("Disable DCC Address Set Mode"));
-      #endif
-      if(AddrSetMode == ADDR_SET_ENABLED)
-        Dcc.setAccDecDCCAddrNextReceived(0);
-          
-      AddrSetMode = ADDR_SET_DISABLED;
+  switch(AddrSetMode)                                             //  Enable Decoder Address Setting from next received Accessory Decoder packet
+  {
+    case ADDR_SET_DISABLED:
+      if(digitalRead(PROG_JUMPER_PIN) == LOW)
+      {
+        #ifdef SERIAL_DEBUG
+        Serial.println(F("Enable DCC Address Set Mode"));
+        #endif
+        AddrSetMode = ADDR_SET_ENABLED;
+        Dcc.setAccDecDCCAddrNextReceived(1);  
+      }
+      break;
+    default:
+      if(digitalRead(PROG_JUMPER_PIN) == HIGH)
+      {
+        #ifdef SERIAL_DEBUG
+        Serial.println(F("Disable DCC Address Set Mode"));
+        #endif
+        if(AddrSetMode == ADDR_SET_ENABLED)
+          Dcc.setAccDecDCCAddrNextReceived(0);
+            
+        AddrSetMode = ADDR_SET_DISABLED;
+      }
+      break;
+  }
+
+  ////////////////////////////
+  //  SPECIAL EFFECTS CODE  //
+  ////////////////////////////
+  
+  #if !defined( SERIAL_DEBUG ) && !defined( LIGHT_DEBUG ) && !defined( SERIAL_DEBUG_NOTIFY_DCC_MSG )
+  
+  for(int headIndex = 0; headIndex < NUM_HEADS; headIndex++) 
+  { 
+    if (headStates[headIndex].inputStabilizeCount < 60)
+    {                               
+      headStates[headIndex].inputStabilizeCount ++;                   //  Make sure both inputs are stable before calculating requests
+    }
+    //  Check if head is actively animating or is between consecutive segments of animation.
+    else if( headStates[headIndex].headStatus == STATE_ANIMATE || headStates[headIndex].headStatus == STATE_ANIMATE_BLACK )  
+    {            
+      if( millis() - headStates[headIndex].lastAnimateTime >= ANIMATE_DELAY_TIME ) //  And check if it's time to fire off the next frame of animation (every 20ms)
+      { 
+        // If the signal's starting color does not equal it's target color, if the signal is not in a black animation state, 
+        // and if the current color of the signal is the starting color of the signal...
+        if( ( headStates[headIndex].startColor != headStates[headIndex].nextColor ) && ( headStates[headIndex].headState != STATE_ANIMATE_BLACK )
+                                                                        && ( headStates[headIndex].startColor == headStates[headIndex].currColor ) ) 
+        {                                                                
+          leaveColorFunc( headIndex, headStates[headIndex].startColor )   //  Leave the current color of the signal head (animation)
+        }
+        else if( headStates[headIndex].tempColor == BLACK ) // If we're in the middle of an animation transition...
+        {
+          if( abs( headStates[headIndex].colorCache[headStates[headIndex].currColor].vanePos - headStates[headIndex].colorCache[headStates[headIndex].nextColor].vanePos ) == 1 ) 
+          {          // Get vane position for current color                                  // Get vane position for target color           
+            // If the signal is currently one lens away from its target, and the next color is red...
+            if(headStates[headIndex].nextColor == RED)
+            {
+              //  If the next color is RED...
+              stopAtDeEnergizedFunc( headIndex, RED );                        //  ...move to the red aspect, which is deenergized in most setups (safety precaution).
+            }
+            else 
+            {
+              //  If the next color is NOT red...
+              stopAtEnergizedFunc( headIndex, headStates[headIndex].nextColor );         //  ...move to the specified color, which is energized in most setups.
+            }
+          }
+          else if( ( headStates[headIndex].colorCache[headStates[headIndex].currColor].vanePos - headStates[headIndex].colorCache[headStates[headIndex].nextColor].vanePos ) >= 2 ) 
+          {          // Get vane position for current color                                  // Get vane position for target color 
+            
+            bypassColorFunc( headNumber, vaneOrder[headStates[headIndex].colorCache[headStates[headIndex].currColor].vanePos - 1] );
+                                          // Look up the vane ID that is one less than the current vane
+          }
+          else if( ( headStates[headIndex].colorCache[headStates[headIndex].currColor].vanePos - headStates[headIndex].colorCache[headStates[headIndex].nextColor].vanePos ) <= -2 ) 
+          {          // Get vane position for current color                                  // Get vane position for target color 
+            
+            bypassColorFunc( headNumber, vaneOrder[headStates[headIndex].colorCache[headStates[headIndex].currColor].vanePos + 1] );
+                                          // Look up the vane ID that is one less than the current vane
+          }
+        }
+      }
     }
   }
-}
-
-void notifyCVResetFactoryDefault()
-{
-  #ifdef SERIAL_DEBUG
-  Serial.println(F("notifyCVResetFactoryDefault"));
   #endif
-
-  FactoryDefaultCVIndex = sizeof(FactoryDefaultCVs) / sizeof(CVPair); // Make FactoryDefaultCVIndex non-zero and equal to num CV's to be reset
-                                                                      // to flag to the loop() function that a reset to Factory Defaults needs 
-                                                                      // to be done
-};
+}
