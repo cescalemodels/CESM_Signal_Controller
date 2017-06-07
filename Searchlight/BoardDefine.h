@@ -1,16 +1,17 @@
 /**********************************************************************
 
-Searchlight Driver Code
+BoardDefine.h
 COPYRIGHT (C) 2017 David J. Cutting
 
-Special thanks to Alex Shepard for his work on this code. Without his
-    help this project wouldn't have been possible.
-
-Special thanks to Mike Weber, who graciously provided his wonderful 
-    BLMA searchlight driver code, which was heavily modified and
-    integrated into this code.
+Part of CESM_SEARCHLIGHT_CONTROLLER
 
 **********************************************************************/
+
+//////////////////////////////////
+//  INCLUDE REQUIRED LIBRARIES  //
+//////////////////////////////////
+
+#include <SoftPWM.h>                                                  //  Include SoftPWM library from here: https://github.com/Palatis/arduino-softpwm/ 
 
 ///////////////////////////////////////////
 //  DEFINE PINS BASED ON SELECTED BOARD  //

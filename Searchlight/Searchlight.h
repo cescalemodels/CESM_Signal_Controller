@@ -1,14 +1,9 @@
 /**********************************************************************
 
-Searchlight Driver Code
+Searchlight.h
 COPYRIGHT (C) 2017 David J. Cutting
 
-Special thanks to Alex Shepard for his work on this code. Without his
-    help this project wouldn't have been possible.
-
-Special thanks to Mike Weber, who graciously provided his wonderful 
-    BLMA searchlight driver code, which was heavily modified and
-    integrated into this code.
+Part of CESM_SEARCHLIGHT_CONTROLLER
 
 **********************************************************************/
 
@@ -32,27 +27,43 @@ Special thanks to Mike Weber, who graciously provided his wonderful
 NmraDcc Dcc;                                                          //  Create an NmraDcc object named Dcc
 DCC_MSG Packet;                                                       //  Create a DCC_MSG object named Packet
 
+////////////////////////////
+//  SET UP DCC VARIABLES  //
+//////////////////////////// 
+
+typedef enum
+{
+  ADDR_SET_DISABLED = 0,
+  ADDR_SET_DONE,
+  ADDR_SET_ENABLED
+} ADDR_SET_MODE;
+
+ADDR_SET_MODE AddrSetMode = ADDR_SET_DISABLED ;                       //  Keeps track of whether the programming jumper is set
+
+uint16_t baseAddress;                                                 //  Keeps track of the base address of the decoder
+uint8_t FactoryDefaultCVIndex = 0;                                    //  Controls reset of the decoder
+uint8_t commonPole;                                                   //  Keeps track of whether the decoder is set up as common anode or common cathode
+
+/////////////////////////////////////
+//  SET UP EFFECT TIMER VARIABLES  //
+///////////////////////////////////// 
+
+#define ANIMATE_DELAY_TIME 20
+#define FLASH_PULSE_DELAY 1000
+
 ////////////////////////////////////
 //  SET UP SIGNAL HEAD CONSTANTS  //
 ////////////////////////////////////
 
-#define NUM_HEADS         3                                           //  Defines 3 heads on signal decoder if the searchlight configuration is selected
-#define NUM_LED_PER_HEAD  3                                           //  Defines 3 LEDs in each signal head
-#define NUM_ASPECTS       9                                           //  Defines 9 possible aspects (controlled by aspectTable)
-#define NUM_LENSES        4                                           //  Defines 4 lenses per signal head (order controlled by lensArrangement)
-#define NUM_PINS          9                                           //  Defines 9 pins on the decoder
-#define NUM_COLORS        5                                           //  Defines 5 possible colors for output
+#define NUM_HEADS   3                                                 //  Defines 3 heads on signal decoder if the searchlight configuration is selected
+#define NUM_ASPECTS 9                                                 //  Defines 9 possible aspects (controlled by aspectTable)
+#define NUM_COLORS  5                                                 //  Defines 5 possible colors for output
 
 #define BLACK   0                                                     //  Black color ID
 #define RED     1                                                     //  Red color ID                                        
 #define GREEN   2                                                     //  Green color ID
 #define YELLOW  3                                                     //  Yellow color ID
 #define LUNAR   4                                                     //  Lunar color ID   
-
-#define LENS_GREEN 0
-#define LENS_RED 1
-#define LENS_YELLOW 2
-#define LENS_LUNAR 3
 
 #define STATE_IDLE          0                                         //  Idle state ID for switch case
 #define STATE_ANIMATE       1                                         //  Dimming ID for switch case
@@ -61,14 +72,15 @@ DCC_MSG Packet;                                                       //  Create
 #define OFF 0                                                         //  Defines off as 0
 #define ON  1                                                         //  Defines on as 1
 
-#define NO_EFFECT 0                                                   //  No special effect
-#define EFFECT_ON 1                                                   //  Vane movement effect
-#define EFFECT_FLASHING 2                                             //  Flashing effect
-#define EFFECT_ON_FLASHING 3                                          //  Flashing and vane movement effects
+#define NO_EFFECT           0                                         //  No special effect
+#define EFFECT_ON           1                                         //  Vane movement effect
+#define EFFECT_FLASHING     2                                         //  Flashing effect
+#define EFFECT_ON_FLASHING  3                                         //  Flashing and vane movement effects
 
 #define CV_OPS_MODE_ADDRESS_LSB 33                                    //  Because most DCC Command Stations don't support the DCC Accessory Decoder OPS Mode programming,
-                                                                      //  we fake a DCC Mobile Decoder Address for OPS Mode Programming. This is one of the two CV numbers 
+#define CV_OPS_MODE_ADDRESS_MSB 34                                    //  we fake a DCC Mobile Decoder Address for OPS Mode Programming. This is one of the two CV numbers 
                                                                       //  that controls it.
+                                                                      
 
 struct CVPair
 {
@@ -81,54 +93,34 @@ CVPair FactoryDefaultCVs[] =
   {CV_ACCESSORY_DECODER_ADDRESS_LSB, DEFAULT_ADDRESS},                //  Set the accessory decoder address
   {CV_ACCESSORY_DECODER_ADDRESS_MSB, 0},                             
   
-  {CV_OPS_MODE_ADDRESS_LSB,DEFAULT_ADDRESS},                          //  Set the OPS mode programming address
-  {CV_OPS_MODE_ADDRESS_LSB+1, 0},
+  {CV_OPS_MODE_ADDRESS_LSB, DEFAULT_ADDRESS},                          //  Set the OPS mode programming address
+  {CV_OPS_MODE_ADDRESS_MSB, 0},
   
   {30, 0},                                                            //  Polarity for all heads - 0 = Common Anode, 1 = Common Cathode      
 
   {35, 0},                                                            //  Dark aspect red LED intensity (0 = 0%, 63 = 100%)
-  {36, 0},                                                            //  Dark aspect green LED intensity
-  {37, 0},                                                            //  Dark aspect blue LED intensity
+  {36, 0},                                                            //  Dark aspect green LED intensity (0 = 0%, 63 = 100%)
+  {37, 0},                                                            //  Dark aspect blue LED intensity (0 = 0%, 63 = 100%)
   
-  {38, 63},                                                           //  Red aspect red LED intensity
-  {39, 0},                                                            //  Red aspect green LED intensity
-  {40, 0},                                                            //  Red aspect blue LED intensity
+  {38, 63},                                                           //  Red aspect red LED intensity (0 = 0%, 63 = 100%)
+  {39, 0},                                                            //  Red aspect green LED intensity (0 = 0%, 63 = 100%)
+  {40, 0},                                                            //  Red aspect blue LED intensity (0 = 0%, 63 = 100%)
   
-  {41, 0},                                                            //  Green aspect red LED intensity
-  {42, 63},                                                           //  Green aspect green LED intensity
-  {43, 0},                                                            //  Green aspect blue LED intensity
+  {41, 0},                                                            //  Green aspect red LED intensity (0 = 0%, 63 = 100%)
+  {42, 63},                                                           //  Green aspect green LED intensity (0 = 0%, 63 = 100%)
+  {43, 0},                                                            //  Green aspect blue LED intensity (0 = 0%, 63 = 100%)
   
-  {44, 63},                                                           //  Yellow aspect red LED intensity
-  {45, 63},                                                           //  Yellow aspect green LED intensity
-  {46, 0},                                                            //  Yellow aspect blue LED intensity
+  {44, 63},                                                           //  Yellow aspect red LED intensity (0 = 0%, 63 = 100%)
+  {45, 63},                                                           //  Yellow aspect green LED intensity (0 = 0%, 63 = 100%)
+  {46, 0},                                                            //  Yellow aspect blue LED intensity (0 = 0%, 63 = 100%)
   
-  {47, 63},                                                           //  Lunar aspect red LED intensity
-  {48, 63},                                                           //  Lunar aspect green LED intensity
-  {49, 63},                                                           //  Lunar aspect blue LED intensity
+  {47, 63},                                                           //  Lunar aspect red LED intensity (0 = 0%, 63 = 100%)
+  {48, 63},                                                           //  Lunar aspect green LED intensity (0 = 0%, 63 = 100%)
+  {49, 63},                                                           //  Lunar aspect blue LED intensity (0 = 0%, 63 = 100%)
   
-  {50, 1},                                                            //  Head A enable/disable fading
-  {51, 1},                                                            //  Head B enable/disable fading
-  {52, 1},                                                            //  Head C enable/disable fading
-  
-  {53, 1},                                                            //  Head A enable/disable vane movement
-  {54, 1},                                                            //  Head B enable/disable vane movement
-  {55, 1},                                                            //  Head C enable/disable vane movement
-  
-  {56, 5},                                                            //  Head A fade steps per tick
-  {57, 5},                                                            //  Head B fade steps per tick
-  {58, 5},                                                            //  Head C fade steps per tick
-
-  {59, 2},                                                            //  Head A vane steps per tick
-  {60, 2},                                                            //  Head B vane steps per tick
-  {61, 2},                                                            //  Head C vane steps per tick   
-
-  {66, RED},                                                          //  De-energized solenoid color for all heads (RED, YELLOW, LUNAR, GREEN, or DARK)
-
-  {67, 1},                                                            //  Flashes per second, signal head A
-  {68, 1},                                                            //  Flashes per second, signal head B  
-  {69, 1},                                                            //  Flashes per second, signal head C
+  {53, 1},                                                            //  Enable/Disable vane movement
+  {54, 1}                                                             //  Enable/Disable flashing 
 };
-
 
 // The following four lists define the intensities of the colors at different points along the animation. They scale from 0 to 63.
 const byte bypassColor[] = {6, 22, 47, 62, 49, 15, 5, 0};
@@ -165,10 +157,11 @@ struct headState                                                      //  headSt
   byte    headStatus = STATE_IDLE;
   byte    effect = NO_EFFECT;                                         
 
-  colorInfo currLens = colorCache[RED];
+  colorInfo colorInfo = colorCache[RED];
 
   int     inputStabilizeCount = 0;
   int     lastAnimateTime = 0;
+  int     lastFlashTime = 0;
   int     frame = 0;
 };   
 
@@ -193,73 +186,3 @@ aspectInfo aspectTable[ NUM_ASPECTS ] =
   {LUNAR,   ON,   EFFECT_ON_FLASHING},                                // Aspect 7 is lens 3 (lunar) with a flashing (always) vane (if enabled) effect
   {BLACK,   OFF,  NO_EFFECT}                                          // Aspect 8 is dark
 };
-
-typedef enum
-{
-  ADDR_SET_DISABLED = 0,
-  ADDR_SET_DONE,
-  ADDR_SET_ENABLED
-} ADDR_SET_MODE;
-
-
-
-void leaveColorFunc( uint8_t headNumber, byte colorToLeave )
-{
-  if(headStates[headNumber].frame < 12)
-  {
-    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToLeave].red / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToLeave].grn / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToLeave].blu / 63 );
-    headStates[headNumber].frame ++;
-    headStates[headNumber].lastAnimateTime = millis();
-    return;
-  }
-  headStates[headIndex].headStatus = STATE_IDLE;
-  headStates[headIndex].tempColor = DARK;
-  frame = 0;
-}
-
-void bypassColorFunc( uint8_t headNumber, byte colorToPass) {
-  if(headStates[headNumber].frame < 8) 
-  {
-    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToPass].red / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToPass].grn / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToPass].blu / 63 );
-    headStates[headNumber].frame ++;
-    headStates[headNumber].lastAnimateTime = millis();
-    return;
-  }
-  headStates[headIndex].headStatus = STATE_IDLE;
-  headStates[headIndex].tempColor = DARK;
-  frame = 0;
-}
-
-void stopAtEnergizedFunc( uint8_t headNumber, byte colorToStopAt ) {
-  if(headStates[headNumber].frame < 33) 
-  {
-    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].red / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].grn / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].blu / 63 );
-    headStates[headNumber].frame ++;
-    headStates[headNumber].lastAnimateTime = millis();
-    return;
-  }
-  headStates[headIndex].headStatus = STATE_IDLE;
-  headStates[headIndex].tempColor = DARK;
-  frame = 0;
-}
-
-void stopAtDeEnergizedFunc( uint8_t headNumber, byte colorToStopAt=RED ) {
-  if(headStates[headNumber].frame < 52) 
-  {
-    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].red / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].grn / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].blu / 63 );
-    headStates[headNumber].frame ++;
-    headStates[headNumber].lastAnimateTime = millis();
-    return;
-  }
-  headStates[headIndex].headStatus = STATE_IDLE;
-  headStates[headIndex].tempColor = DARK;
-  frame = 0;
-}
