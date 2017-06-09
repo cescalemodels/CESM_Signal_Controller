@@ -92,9 +92,7 @@ CVPair FactoryDefaultCVs[] =
   {CV_ACCESSORY_DECODER_ADDRESS_MSB, 0},                             
   
   {CV_OPS_MODE_ADDRESS_LSB, DEFAULT_ADDRESS},                          //  Set the OPS mode programming address
-  {CV_OPS_MODE_ADDRESS_MSB, 0},
-  
-  {30, 0},                                                            //  Polarity for all heads - 0 = Common Anode, 1 = Common Cathode      
+  {CV_OPS_MODE_ADDRESS_MSB, 0},     
 
   {35, 0},                                                            //  Dark aspect red LED intensity (0 = 0%, 63 = 100%)
   {36, 0},                                                            //  Dark aspect green LED intensity (0 = 0%, 63 = 100%)
@@ -117,7 +115,9 @@ CVPair FactoryDefaultCVs[] =
   {49, 63},                                                           //  Lunar aspect blue LED intensity (0 = 0%, 63 = 100%)
   
   {53, 1},                                                            //  Enable/Disable vane movement
-  {54, 1}                                                             //  Enable/Disable flashing 
+  {54, 1},                                                            //  Enable/Disable flashing 
+
+  {55, 1},                                                            //  Polarity for all heads - 1 = Common Anode, 0 = Common Cathode 
 };
 
 // The following four lists define the intensities of the colors at different points along the animation. They scale from 0 to 63.

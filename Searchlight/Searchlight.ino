@@ -88,9 +88,6 @@ void setup()
                                                                       //  manufacturer ID to the one set in Config.h, set the CV29 flags, and set the 
                                                                       //  operations mode address.
   
-  baseAddress = Dcc.getAddr();                                        //  Preload the decoder address
-  commonPole = Dcc.getCV(30);                                         //  Preload commonpole variable
-  
   #ifdef SERIAL_DEBUG
   Serial.begin( DEBUG_BAUD_RATE );                                    //  Start the serial line at baud rate specified in Config.h
   Serial.println(F("\nCESM_Searchlight_Decoder"));
@@ -102,9 +99,23 @@ void setup()
   Palatis::SoftPWM.begin(60);                                         //  Begin soft PWM with 60hz pwm frequency
   #endif
 
+  #define RESET_CVS_ON_POWER
   #ifdef RESET_CVS_ON_POWER
   notifyCVResetFactoryDefault();                                      //  Force Restore to factory defaults whenever decoder is restarted (enable in config)
   #endif
+
+  baseAddress = Dcc.getAddr();                                        //  Preload the decoder address
+  commonPole = Dcc.getCV(55);                                         //  Preload commonpole variable
+
+  setSoftPWMValues( 0, 63, 0, 0 );
+  delay(750);
+  setSoftPWMValues( 0, 0, 63, 0 );
+  delay(750);
+  setSoftPWMValues( 0, 0, 0, 63 );
+  delay(750);
+  setSoftPWMValues( 0, 63, 63, 63 );
+  delay(750);
+  setSoftPWMValues( 0, colorCache[1].red, colorCache[1].grn, colorCache[1].blu );
 }
 
 /////////////////
@@ -113,6 +124,7 @@ void setup()
 
 void loop() 
 {
+  Dcc.process();                                                      //  Read the DCC bus and process the signal. Needs to be called frequently.
   DccBackEndFunc();                                                   //  Runs all DCC Back-end operations ( separate function keeps code clean )
   
   /////////////////////////////////
@@ -227,7 +239,7 @@ void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifi
   uint8_t headIndex = Addr - baseAddress ;                            //  Determine which head we're talking about (0, 1, 2, ...)
  
   headStates[headIndex].headStatus = STATE_ANIMATE;                   //  Sets the status to idle (not dimming or brightening)
-  headStates[headIndex].nextColor = aspectTable[State].colorID;    //  Looks up the lens number in the aspect table, stores to head info table.
+  headStates[headIndex].nextColor = aspectTable[State].colorID;       //  Looks up the color number in the aspect table, stores to head info table.
   headStates[headIndex].effect = aspectTable[State].effect;           //  Looks up the aspect effect and stores it to head info table
   headStates[headIndex].inputStabilizeCount = 0;                      //  Reset the stabilization timer
 
@@ -237,7 +249,7 @@ void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifi
   #endif
 
   #ifdef LIGHT_DEBUG
-  setSoftPWMValues( headIndex, colorCache[headStates[headIndex].currColor].red, colorCache[headStates[headIndex].currColor].grn, colorCache[headStates[headIndex].currColor].blu ); 
+  setSoftPWMValues( headIndex, colorCache[headStates[headIndex].nextColor].red, colorCache[headStates[headIndex].nextColor].grn, colorCache[headStates[headIndex].nextColor].blu ); 
   #endif
 }
 
@@ -260,8 +272,6 @@ void notifyDccMsg( DCC_MSG * Msg )                                    //  Prints
 
 void DccBackEndFunc()
 {
-  Dcc.process();                                                //  Read the DCC bus and process the signal. Needs to be called frequently.
-
   ////////////////////////////
   //  RESET ALL CV TRIGGER  //
   ////////////////////////////
@@ -353,7 +363,7 @@ void notifyCVChange( uint16_t CV, uint8_t Value )
     case CV_ACCESSORY_DECODER_ADDRESS_MSB:
       baseAddress = Dcc.getAddr();
       break;
-    case 30:
+    case 55:
       commonPole = Value;
       break;
   }
