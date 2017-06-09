@@ -170,7 +170,7 @@ void loop()
       }
     }
     //  If the signal is not currently animating, and it's either set to flashing or vane plus flashing mode...
-    if( ( headStates[headIndex].headStatus != STATE_ANIMATE ) && ( ( headStates[headIndex].effect == EFFECT_FLASHING ) || ( headStates[headIndex].effect == EFFECT_ON_FLASHING ) ) )
+    if( ( headStates[headIndex].headStatus != STATE_ANIMATE ) && ( headStates[headIndex].effect == EFFECT_FLASHING ) )
     {
       if( millis() - headStates[headIndex].lastAnimateTime > FLASH_PULSE_DELAY ) 
       {
@@ -225,10 +225,9 @@ void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifi
   }
 
   uint8_t headIndex = Addr - baseAddress ;                            //  Determine which head we're talking about (0, 1, 2, ...)
-
-  headStates[headIndex].nextColor = State;                            //  Stores the state in the current aspect  
+ 
   headStates[headIndex].headStatus = STATE_ANIMATE;                   //  Sets the status to idle (not dimming or brightening)
-  headStates[headIndex].currColor = aspectTable[State].lensNumber;    //  Looks up the lens number in the aspect table, stores to head info table.
+  headStates[headIndex].nextColor = aspectTable[State].colorID;    //  Looks up the lens number in the aspect table, stores to head info table.
   headStates[headIndex].effect = aspectTable[State].effect;           //  Looks up the aspect effect and stores it to head info table
   headStates[headIndex].inputStabilizeCount = 0;                      //  Reset the stabilization timer
 

@@ -73,9 +73,7 @@ uint8_t commonPole;                                                   //  Keeps 
 #define ON  1                                                         //  Defines on as 1
 
 #define NO_EFFECT           0                                         //  No special effect
-#define EFFECT_ON           1                                         //  Vane movement effect
-#define EFFECT_FLASHING     2                                         //  Flashing effect
-#define EFFECT_ON_FLASHING  3                                         //  Flashing and vane movement effects
+#define EFFECT_FLASHING     1                                         //  Flashing effect
 
 #define CV_OPS_MODE_ADDRESS_LSB 33                                    //  Because most DCC Command Stations don't support the DCC Accessory Decoder OPS Mode programming,
 #define CV_OPS_MODE_ADDRESS_MSB 34                                    //  we fake a DCC Mobile Decoder Address for OPS Mode Programming. This is one of the two CV numbers 
@@ -169,20 +167,20 @@ headState headStates[3];
 
 struct aspectInfo
 {
-  byte    lensNumber;
+  byte    colorID;
   byte    on_off;
   byte    effect;
 };
 
 aspectInfo aspectTable[ NUM_ASPECTS ] = 
 {
-  {RED,     ON,   EFFECT_ON},                                         // Aspect 0 is lens 1 (red) with a vane effect (if enabled)
-  {YELLOW,  ON,   EFFECT_ON},                                         // Aspect 1 is lens 2 (yellow) with a vane effect (if enabled)
-  {GREEN,   ON,   EFFECT_ON},                                         // Aspect 2 is lens 0 (green) with a vane effect (if enabled)
-  {LUNAR,   ON,   EFFECT_ON},                                         // Aspect 3 is lens 3 (lunar) with a vane effect (if enabled)
-  {RED,     ON,   EFFECT_ON_FLASHING},                                // Aspect 4 is lens 1 (red) with a flashing (always) vane (if enabled) effect
-  {YELLOW,  ON,   EFFECT_ON_FLASHING},                                // Aspect 5 is lens 2 (yellow) with a flashing (always) vane (if enabled) effect
-  {GREEN,   ON,   EFFECT_ON_FLASHING},                                // Aspect 6 is lens 0 (green) with a flashing (always) vane (if enabled) effect
-  {LUNAR,   ON,   EFFECT_ON_FLASHING},                                // Aspect 7 is lens 3 (lunar) with a flashing (always) vane (if enabled) effect
+  {RED,     ON,   NO_EFFECT},                                         // Aspect 0 is lens 1 (red) with a vane effect (if enabled)
+  {YELLOW,  ON,   NO_EFFECT},                                         // Aspect 1 is lens 2 (yellow) with a vane effect (if enabled)
+  {GREEN,   ON,   NO_EFFECT},                                         // Aspect 2 is lens 0 (green) with a vane effect (if enabled)
+  {LUNAR,   ON,   NO_EFFECT},                                         // Aspect 3 is lens 3 (lunar) with a vane effect (if enabled)
+  {RED,     ON,   EFFECT_FLASHING},                                   // Aspect 4 is lens 1 (red) with a flashing (always) vane (if enabled) effect
+  {YELLOW,  ON,   EFFECT_FLASHING},                                   // Aspect 5 is lens 2 (yellow) with a flashing (always) vane (if enabled) effect
+  {GREEN,   ON,   EFFECT_FLASHING},                                   // Aspect 6 is lens 0 (green) with a flashing (always) vane (if enabled) effect
+  {LUNAR,   ON,   EFFECT_FLASHING},                                   // Aspect 7 is lens 3 (lunar) with a flashing (always) vane (if enabled) effect
   {BLACK,   OFF,  NO_EFFECT}                                          // Aspect 8 is dark
 };

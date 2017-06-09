@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet type="text/xsl" href="../XSLT/decoder.xsl"?>
+<!-- Copyright (C) JMRI 2001, 2005, 2007, 2009, 2010 All rights reserved -->
+<!-- $Id$ -->
+...
+<decoder-config xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://jmri.org/xml/schema/decoder.xsd">
+	<version author="David J. Cutting - dave@cescalemodels.com" version="1" lastUpdated="20170608"/>
+	<decoder>
+		<family name="CESM Signal Decoders" mfg="CESM" lowVersionID="0" highVersionID="255" comment="CESM Searchlight Decoder, etc." >
+			<model model="CESM_Searchlight_Decoder" />
+		</family>
+		<programming direct="no" paged="no" register="no" ops="yes"></programming>
+		<variables>
+			<variable CV="35" item="Black Aspect: Red LED Brightness" default="00">
+				<decVal min="0" max="63"/>
+				<label>Black Aspect: Red LED Brightness</label>
+				<comment>NMRA standard form</comment>
+				<tooltip>Black Aspect: Red LED Brightness (0-63)</tooltip>
+			</variable>
+		</variables>
+		<capability>
+			<name>Ops Mode Accessory Programming</name>
+			<parameter name="Address Type">decoder</name>
+		</capability>
