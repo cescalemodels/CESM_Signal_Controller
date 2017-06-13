@@ -96,7 +96,7 @@ void setup()
   #endif
 
   #ifndef SERIAL_DEBUG
-  Palatis::SoftPWM.begin(60);                                         //  Begin soft PWM with 60hz pwm frequency
+  Palatis::SoftPWM.begin(30);                                         //  Begin soft PWM with 60hz pwm frequency
   #endif
 
   #define RESET_CVS_ON_POWER
