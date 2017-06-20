@@ -127,15 +127,15 @@ const byte stopAtEnergized[] = {6, 14, 20, 27, 36, 49, 60, 63, 63, 51, 26, 38, 4
 const byte stopAtNonEnergized[] = {1, 4, 12, 32, 37, 44, 54, 63, 63, 63, 63, 63, 63, 63, 63, 63, 57, 52, 42, 28, 19, 6, 6, 10, 14, 21, 
                                        28, 36, 44, 55, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 57, 53, 47, 41, 32, 28, 35, 42, 49, 55, 63};
 
-struct colorInfo
+typedef struct 
 {
   byte    vanePos;
   byte    red;
   byte    grn;
   byte    blu;
-};
+} ColorInfo;
 
-colorInfo colorCache[ NUM_COLORS ] =
+ColorInfo colorCache[ NUM_COLORS ] =
 {
   {0, Dcc.getCV(35), Dcc.getCV(36), Dcc.getCV(37)},  // Black
   {1, Dcc.getCV(38), Dcc.getCV(39), Dcc.getCV(40)},  // Red
@@ -146,7 +146,7 @@ colorInfo colorCache[ NUM_COLORS ] =
 
 const byte vaneOrder[] = {GREEN, RED, YELLOW, LUNAR};
 
-struct headState                                                      //  headState structure controls the behavior of each head
+typedef struct                                                      //  headState structure controls the behavior of each head
 {
   byte    startColor = RED;                                           //  Color of the signal when command was recieved from DCC system
   byte    currColor = RED;                                            //  Color of the aspect in animation
@@ -155,24 +155,24 @@ struct headState                                                      //  headSt
   byte    headStatus = STATE_IDLE;
   byte    effect = NO_EFFECT;                                         
 
-  colorInfo colorInfo = colorCache[RED];
+  ColorInfo colorInfo = colorCache[RED];
 
   int     inputStabilizeCount = 0;
   int     lastAnimateTime = 0;
   int     lastFlashTime = 0;
   int     frame = 0;
-};   
+} HeadState;   
 
-headState headStates[3];
+HeadState headStates[3];
 
-struct aspectInfo
+typedef struct
 {
   byte    colorID;
   byte    on_off;
   byte    effect;
-};
+} AspectInfo;
 
-aspectInfo aspectTable[ NUM_ASPECTS ] = 
+AspectInfo aspectTable[ NUM_ASPECTS ] = 
 {
   {RED,     ON,   NO_EFFECT},                                         // Aspect 0 is lens 1 (red) with a vane effect (if enabled)
   {YELLOW,  ON,   NO_EFFECT},                                         // Aspect 1 is lens 2 (yellow) with a vane effect (if enabled)
