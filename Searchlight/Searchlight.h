@@ -88,10 +88,10 @@ struct CVPair
 
 CVPair FactoryDefaultCVs[] =
 {
-  {CV_ACCESSORY_DECODER_ADDRESS_LSB, DEFAULT_ADDRESS},                //  Set the accessory decoder address
+  {CV_ACCESSORY_DECODER_ADDRESS_LSB, DEFAULT_ADDRESS + 1},            //  Set the accessory decoder address. Needs to be +1 to be compatible with DCC Spec
   {CV_ACCESSORY_DECODER_ADDRESS_MSB, 0},                             
   
-  {CV_OPS_MODE_ADDRESS_LSB, DEFAULT_ADDRESS},                          //  Set the OPS mode programming address
+  {CV_OPS_MODE_ADDRESS_LSB, DEFAULT_ADDRESS},                         //  Set the OPS mode programming address
   {CV_OPS_MODE_ADDRESS_MSB, 0},     
 
   {35, 0},                                                            //  Dark aspect red LED intensity (0 = 0%, 63 = 100%)
