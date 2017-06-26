@@ -24,8 +24,7 @@ Part of CESM_SEARCHLIGHT_CONTROLLER
 //  Enable serial debug, print all recieved DCC packets to serial line (no other debug messages)
 
 //#define SERIAL_DEBUG
-//#define LIGHT_DEBUG
-//#define SERIAL_DEBUG_NOTIFY_DCC_MSG
+//#define NOTIFY_DCC_MESSAGE
 
 #define DEBUG_BAUD_RATE 115200
 

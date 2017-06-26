@@ -35,7 +35,7 @@ SOFTPWM_DEFINE_CHANNEL(5, DDRA, PORTA, PORTA5);                       //  Create
 SOFTPWM_DEFINE_CHANNEL(6, DDRA, PORTA, PORTA6);                       //  Creates soft PWM channel 6 on Port A6 (Pin 7)
 SOFTPWM_DEFINE_CHANNEL(7, DDRA, PORTA, PORTA7);                       //  Creates soft PWM channel 7 on Port A7 (Pin 8)
 SOFTPWM_DEFINE_CHANNEL(8, DDRB, PORTB, PORTB0);                       //  Creates soft PWM channel 8 on Port B0 (Pin 9)
-SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 64);                         //  Defines the 9 soft PWM channels with 64 step resolution
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 32);                         //  Defines the 9 soft PWM channels with 64 step resolution
 #endif
 
 #elif defined(__AVR_ATmega328P__) || defined(__AVR_ATmega168__)       //  PIN DEFINITIONS FOR ATMEGA328P/168 BOARDS
@@ -57,7 +57,7 @@ SOFTPWM_DEFINE_CHANNEL(5, DDRB, PORTB, PORTB0);                       //  Create
 SOFTPWM_DEFINE_CHANNEL(6, DDRB, PORTB, PORTB1);                       //  Creates soft PWM channel 6 on Port B1 (Pin 9)
 SOFTPWM_DEFINE_CHANNEL(7, DDRB, PORTB, PORTB2);                       //  Creates soft PWM channel 7 on Port B2 (Pin 10)
 SOFTPWM_DEFINE_CHANNEL(8, DDRB, PORTB, PORTB3);                       //  Creates soft PWM channel 8 on Port B3 (Pin 11)
-SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 64);                         //  Defines the 9 soft PWM channels with 64 step resolution
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 32);                         //  Defines the 9 soft PWM channels with 64 step resolution
 #endif
 
 #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)      //  PIN DEFINITIONS FOR ATMEGA2560/1280 BOARDS
@@ -79,7 +79,7 @@ SOFTPWM_DEFINE_CHANNEL(5, DDRH, PORTH, PORTH5);                       //  Create
 SOFTPWM_DEFINE_CHANNEL(6, DDRH, PORTH, PORTH6);                       //  Creates soft PWM channel 6 on Port H6 (Pin 9)
 SOFTPWM_DEFINE_CHANNEL(7, DDRB, PORTB, PORTB4);                       //  Creates soft PWM channel 7 on Port B4 (Pin 10)
 SOFTPWM_DEFINE_CHANNEL(8, DDRB, PORTB, PORTB5);                       //  Creates soft PWM channel 8 on Port B5 (Pin 11)
-SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 64);                         //  Defines the 9 soft PWM channels with 64 step resolution
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 32);                         //  Defines the 9 soft PWM channels with 64 step resolution
 #endif
 
 #elif defined(__AVR_ATmega32U4__)                                     //  PIN DEFINITIONS FOR ATMEGA32U4 BOARDS
@@ -101,7 +101,7 @@ SOFTPWM_DEFINE_CHANNEL(5, DDRB, PORTB, PORTB5);                       //  Create
 SOFTPWM_DEFINE_CHANNEL(6, DDRB, PORTB, PORTB6);                       //  Creates soft PWM channel 6 on Port H6 (Pin 9)
 SOFTPWM_DEFINE_CHANNEL(7, DDRB, PORTB, PORTB7);                       //  Creates soft PWM channel 7 on Port B4 (Pin 10)
 SOFTPWM_DEFINE_CHANNEL(8, DDRD, PORTD, PORTD6);                       //  Creates soft PWM channel 8 on Port B5 (Pin 11)
-SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 64);                         //  Defines the 9 soft PWM channels with 64 step resolution
+SOFTPWM_DEFINE_OBJECT_WITH_PWM_LEVELS(9, 32);                         //  Defines the 9 soft PWM channels with 64 step resolution
 #endif
 
 #else                                                                 //  COMPILER ERROR FOR NON-SUPPORTED BOARDS

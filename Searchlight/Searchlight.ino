@@ -65,7 +65,8 @@ void notifyDccMsg( DCC_MSG * Msg );
 void leaveColorFunc( uint8_t, byte );
 void bypassColorFunc( uint8_t, byte );
 void stopAtEnergizedFunc( uint8_t, byte );
-void stopAtDeEnergizedFunc( uint8_t, byte );
+void stopAtDeEnergizedFunc( uint8_t, byte=RED );
+void setSoftPWMValues( uint8_t, uint8_t, uint8_t, uint8_t, byte=ON );
 
 /////////////
 //  SETUP  //
@@ -96,7 +97,7 @@ void setup()
   #endif
 
   #ifndef SERIAL_DEBUG
-  Palatis::SoftPWM.begin(30);                                         //  Begin soft PWM with 60hz pwm frequency
+  Palatis::SoftPWM.begin(120);                                         //  Begin soft PWM with 60hz pwm frequency
   #endif
 
   #define RESET_CVS_ON_POWER
@@ -107,14 +108,16 @@ void setup()
   baseAddress = Dcc.getAddr();                                        //  Preload the decoder address
   commonPole = Dcc.getCV(55);                                         //  Preload commonpole variable
 
-  setSoftPWMValues( 0, 63, 0, 0 );
-  delay(750);
-  setSoftPWMValues( 0, 0, 63, 0 );
-  delay(750);
-  setSoftPWMValues( 0, 0, 0, 63 );
-  delay(750);
-  setSoftPWMValues( 0, 63, 63, 63 );
-  delay(750);
+  setSoftPWMValues( 0, 0, 0, 0 );
+  delay(5000);
+  setSoftPWMValues( 0, 31, 0, 0 );
+  delay(5000);
+  setSoftPWMValues( 0, 0, 31, 0 );
+  delay(5000);
+  setSoftPWMValues( 0, 0, 0, 31 );
+  delay(5000);
+  setSoftPWMValues( 0, 31, 31, 31 );
+  delay(5000);
   setSoftPWMValues( 0, colorCache[1].red, colorCache[1].grn, colorCache[1].blu );
 }
 
@@ -131,23 +134,37 @@ void loop()
   //  VANE SPECIAL EFFECTS CODE  //
   /////////////////////////////////
   
-  #if !defined( SERIAL_DEBUG ) && !defined( LIGHT_DEBUG ) && !defined( SERIAL_DEBUG_NOTIFY_DCC_MSG )
   for(int headIndex = 0; headIndex < NUM_HEADS; headIndex++)          //  For each signal head...
   { 
     if (headStates[headIndex].inputStabilizeCount < 60)               
     {                               
       headStates[headIndex].inputStabilizeCount ++;                   //  Make sure both inputs are stable before executing an animation sequence
     }
-    else if( headStates[headIndex].headStatus == STATE_ANIMATE )      //  Check if head is actively animating or is between consecutive segments of animation.
+    else
     {            
       if( millis() - headStates[headIndex].lastAnimateTime >= ANIMATE_DELAY_TIME ) //  And check if it's time to fire off the next frame of animation (every 20ms)
       { 
-        // If the signal's starting color does not equal it's target color, if the signal is not in a black animation state, 
-        // and if the current color of the signal is the starting color of the signal...
-        if( ( headStates[headIndex].startColor != headStates[headIndex].nextColor ) && ( headStates[headIndex].headStatus != STATE_ANIMATE_BLACK )
-                                                                        && ( headStates[headIndex].startColor == headStates[headIndex].currColor ) ) 
-        {                                                                
-          leaveColorFunc( headIndex, headStates[headIndex].startColor );   //  Leave the current color of the signal head (animation)
+        if( headStates[headIndex].headStatus == STATE_ANIMATE ) {
+          if( headStates[headIndex].startColor == headStates[headIndex].nextColor )
+          {
+            #ifdef SERIAL_DEBUG
+            Serial.println(": n");
+            #endif 
+            headStates[headIndex].headStatus = STATE_IDLE;
+            headStates[headIndex].currColor = headStates[headIndex].startColor;
+            headStates[headIndex].frame = 0;
+          }
+          
+          // If the signal's starting color does not equal it's target color, if the signal is not in a black animation state, 
+          // and if the current color of the signal is the starting color of the signal...
+          else if( ( headStates[headIndex].startColor != headStates[headIndex].nextColor ) && ( headStates[headIndex].headStatus != STATE_ANIMATE_BLACK )
+                                                                          && ( headStates[headIndex].startColor == headStates[headIndex].currColor ) ) 
+          {                                                                
+            leaveColorFunc( headIndex, headStates[headIndex].startColor );   //  Leave the current color of the signal head (animation)
+          #ifdef SERIAL_DEBUG
+            Serial.println(": l");
+          #endif  
+          }
         }
         else if( headStates[headIndex].headStatus == STATE_ANIMATE_BLACK ) // If we're in the middle of an animation transition...
         {
@@ -158,11 +175,17 @@ void loop()
             {
               //  If the next color is RED...
               stopAtDeEnergizedFunc( headIndex, RED );                        //  ...move to the red aspect, which is deenergized in most setups (safety precaution).
+            #ifdef SERIAL_DEBUG
+              Serial.println(": de");
+            #endif 
             }
             else 
             {
               //  If the next color is NOT red...
               stopAtEnergizedFunc( headIndex, headStates[headIndex].nextColor );         //  ...move to the specified color, which is energized in most setups.
+            #ifdef SERIAL_DEBUG
+              Serial.println(": en");
+            #endif 
             }
           }
           else if( ( colorCache[headStates[headIndex].currColor].vanePos - colorCache[headStates[headIndex].nextColor].vanePos ) >= 2 ) 
@@ -170,13 +193,18 @@ void loop()
             
             bypassColorFunc( headIndex, vaneOrder[colorCache[headStates[headIndex].currColor].vanePos - 1] );
                                           // Look up the vane ID that is one less than the current vane
+          #ifdef SERIAL_DEBUG
+            Serial.println(":by");
+          #endif 
           }
           else if( ( colorCache[headStates[headIndex].currColor].vanePos - colorCache[headStates[headIndex].nextColor].vanePos ) <= -2 ) 
           {          // Get vane position for current color                                  // Get vane position for target color 
             
             bypassColorFunc( headIndex, vaneOrder[colorCache[headStates[headIndex].currColor].vanePos + 1] );
                                           // Look up the vane ID that is one less than the current vane
-            
+          #ifdef SERIAL_DEBUG
+            Serial.println(":by");
+          #endif 
           }
         }
       }
@@ -184,26 +212,20 @@ void loop()
     //  If the signal is not currently animating, and it's either set to flashing or vane plus flashing mode...
     if( ( headStates[headIndex].headStatus != STATE_ANIMATE ) && ( headStates[headIndex].effect == EFFECT_FLASHING ) )
     {
-      if( millis() - headStates[headIndex].lastAnimateTime > FLASH_PULSE_DELAY ) 
+      if( ( millis() - headStates[headIndex].lastAnimateTime ) > FLASH_PULSE_DELAY ) 
       {
-        headStates[headIndex].lastAnimateTime = 0;
+        headStates[headIndex].lastAnimateTime = millis();
       }
-      if( millis() - headStates[headIndex].lastAnimateTime <= FLASH_PULSE_DELAY/2 )
+      if( ( millis() - headStates[headIndex].lastAnimateTime ) <= ( FLASH_PULSE_DELAY / 2 ) )
       { 
-        setSoftPWMValues( headIndex, 0, 0, 0 );
+        setSoftPWMValues( headIndex, 0, 0, 0, OFF );
       }
       else
       {
         setSoftPWMValues( headIndex, headStates[headIndex].colorInfo.red, headStates[headIndex].colorInfo.blu, headStates[headIndex].colorInfo.blu );
-      }
-      
+      }   
     }
   }
-  
-  
-
-  
-  #endif
 }
 
 ///////////////////////////////////////////
@@ -213,16 +235,16 @@ void loop()
 void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifies program of an incoming signal packet
 {
   #ifdef  SERIAL_DEBUG
-  Serial.print( F( "notifyDccSigState: Addr: " ) );
+  //Serial.print( F( "notifyDccSigState: Addr: " ) );
   Serial.print( Addr );                                               //  Prints signal address from incoming packet
-  Serial.print( F( " State: " ) );
+  //Serial.print( F( " State: " ) );
   Serial.println( State );                                            //  Print aspect number from incoming packet
   #endif
   
   if( ( Addr < baseAddress ) || ( Addr >= ( baseAddress + NUM_HEADS ) ) )     //  Make sure we're only looking at our addresses
   {
     #ifdef  SERIAL_DEBUG
-    Serial.println( F( "notifyDccSigState: Address out of range" ) );
+    //Serial.println( F( "notifyDccSigState: Address out of range" ) );
     #endif
     
     return;
@@ -230,7 +252,7 @@ void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifi
   if( State > NUM_ASPECTS )                                           //  Check we've got a valid Aspect
   {
     #ifdef  SERIAL_DEBUG
-    Serial.println( F( "notifyDccSigState: State out of range" ) );
+    //Serial.println( F( "notifyDccSigState: State out of range" ) );
     #endif
     
     return;
@@ -253,7 +275,7 @@ void notifyDccSigOutputState( uint16_t Addr, uint8_t State )          //  Notifi
   #endif
 }
 
-#ifdef  SERIAL_DEBUG_NOTIFY_DCC_MSG                                            
+#if defined( NOTIFY_DCC_MSG ) && defined( SERIAL_DEBUG )                                            
 void notifyDccMsg( DCC_MSG * Msg )                                    //  Prints all DCC packets to serial line (enable in Config.h)
 {
   Serial.print( F( "notifyDccMsg: " ) );
@@ -281,18 +303,18 @@ void DccBackEndFunc()
     FactoryDefaultCVIndex--; // Decrement first as initially it is the size of the array
     Dcc.setCV( FactoryDefaultCVs[FactoryDefaultCVIndex].CV, FactoryDefaultCVs[FactoryDefaultCVIndex].Value);
     #ifdef SERIAL_DEBUG
-    Serial.print(F("FactoryDefault CV: "));
-    Serial.print( FactoryDefaultCVs[FactoryDefaultCVIndex].CV );
-    Serial.print(F("  Value: "));
-    Serial.println( FactoryDefaultCVs[FactoryDefaultCVIndex].Value );
+    //Serial.print(F("FactoryDefault CV: "));
+    //Serial.print( FactoryDefaultCVs[FactoryDefaultCVIndex].CV );
+    //Serial.print(F("  Value: "));
+    //Serial.println( FactoryDefaultCVs[FactoryDefaultCVIndex].Value );
     #endif
 
     if(FactoryDefaultCVIndex == 0)
     {    
       baseAddress = Dcc.getAddr();
       #ifdef SERIAL_DEBUG
-      Serial.print(F("Base Address: "));
-      Serial.println(baseAddress);
+      //Serial.print(F("Base Address: "));
+      //Serial.println(baseAddress);
       #endif
     }
   }
@@ -349,13 +371,14 @@ void notifyCVResetFactoryDefault()
 
 void notifyCVChange( uint16_t CV, uint8_t Value )
 {
+  /*
   #ifdef SERIAL_DEBUG
   Serial.print(F("notifyCVChange CV: "));
   Serial.print( CV );
   Serial.print(F(" Value: "));
   Serial.println( Value );
   #endif
-  
+  */
   switch(CV)                                                          //  Changes the locally stored (not EEPROM) values of the CVs if one changes.
   {
     case CV_ACCESSORY_DECODER_ADDRESS_LSB:
@@ -414,87 +437,90 @@ void notifyDccAccOutputAddrSet( uint16_t OutputAddr )
 //  SOFT PWM SETTING FUNCTION  //
 /////////////////////////////////
 
-void setSoftPWMValues( uint8_t headNumber, uint8_t redVal, uint8_t grnVal, uint8_t bluVal )  //  Sets the PWM values of each LED in a certain head
-{          
+void setSoftPWMValues( uint8_t headIndex, uint8_t redVal, uint8_t grnVal, uint8_t bluVal, byte updateStored=ON )  //  Sets the PWM values of each LED in a certain head
+{
+#ifndef SERIAL_DEBUG          
   //  Functions that set the soft PWM values based on the requested value and the common pole variable                                                         
-  Palatis::SoftPWM.set(   headNumber * 3      , (uint8_t) abs( redVal - ( 63 * commonPole ) ) );
-  Palatis::SoftPWM.set( ( headNumber * 3 ) + 1, (uint8_t) abs( grnVal - ( 63 * commonPole ) ) );
-  Palatis::SoftPWM.set( ( headNumber * 3 ) + 2, (uint8_t) abs( bluVal - ( 63 * commonPole ) ) );
-
+  Palatis::SoftPWM.set(   headIndex * 3      , (uint8_t) abs( redVal - ( 31 * commonPole ) ) );
+  Palatis::SoftPWM.set( ( headIndex * 3 ) + 1, (uint8_t) abs( grnVal - ( 31 * commonPole ) ) );
+  Palatis::SoftPWM.set( ( headIndex * 3 ) + 2, (uint8_t) abs( bluVal - ( 31 * commonPole ) ) );
+#endif
   //  Update the head states with the current values of the LEDs
-  headStates[headNumber].colorInfo.red = redVal;
-  headStates[headNumber].colorInfo.grn = grnVal;
-  headStates[headNumber].colorInfo.blu = bluVal;
+  if(updateStored) {
+    headStates[headIndex].colorInfo.red = redVal;
+    headStates[headIndex].colorInfo.grn = grnVal;
+    headStates[headIndex].colorInfo.blu = bluVal;
+  }
 }
 
 /////////////////////////////////
 //  COLOR ANIMATION FUNCTIONS  //
 /////////////////////////////////
 
-void leaveColorFunc( uint8_t headNumber, byte colorToLeave )
+void leaveColorFunc( uint8_t headIndex, byte colorToLeave )
 {
-  if(headStates[headNumber].frame < 12)
+  if(headStates[headIndex].frame < 12)
   {
-    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToLeave].red / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToLeave].grn / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToLeave].blu / 63 );
-    headStates[headNumber].frame ++;
-    headStates[headNumber].lastAnimateTime = millis();
+    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToLeave].red / 31, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToLeave].grn / 31, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToLeave].blu / 31 );
+    headStates[headIndex].frame ++;
+    headStates[headIndex].lastAnimateTime = millis();
     return;
   }
-  headStates[headNumber].headStatus = STATE_ANIMATE_BLACK;
-  headStates[headNumber].currColor = BLACK;
-  headStates[headNumber].frame = 0;
+  headStates[headIndex].headStatus = STATE_ANIMATE_BLACK;
+  headStates[headIndex].currColor = colorToLeave;
+  headStates[headIndex].frame = 0;
 }
 
-void bypassColorFunc( uint8_t headNumber, byte colorToPass) 
+void bypassColorFunc( uint8_t headIndex, byte colorToPass) 
 {
-  if(headStates[headNumber].frame < 8) 
+  if(headStates[headIndex].frame < 8) 
   {
-    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToPass].red / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToPass].grn / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToPass].blu / 63 );
-    headStates[headNumber].frame ++;
-    headStates[headNumber].lastAnimateTime = millis();
+    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToPass].red / 31, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToPass].grn / 31, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToPass].blu / 31 );
+    headStates[headIndex].frame ++;
+    headStates[headIndex].lastAnimateTime = millis();
     return;
   }
-  headStates[headNumber].headStatus = STATE_ANIMATE_BLACK;
-  headStates[headNumber].currColor = BLACK;
-  headStates[headNumber].frame = 0;
+  headStates[headIndex].headStatus = STATE_ANIMATE_BLACK;
+  headStates[headIndex].currColor = colorToPass;
+  headStates[headIndex].frame = 0;
 }
 
-void stopAtEnergizedFunc( uint8_t headNumber, byte colorToStopAt ) 
+void stopAtEnergizedFunc( uint8_t headIndex, byte colorToStopAt ) 
 {
-  if(headStates[headNumber].frame < 33) 
+  if(headStates[headIndex].frame < 33) 
   {
-    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].red / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].grn / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].blu / 63 );
-    headStates[headNumber].frame ++;
-    headStates[headNumber].lastAnimateTime = millis();
+    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].red / 31, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].grn / 31, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].blu / 31 );
+    headStates[headIndex].frame ++;
+    headStates[headIndex].lastAnimateTime = millis();
     return;
   }
-  headStates[headNumber].headStatus = STATE_IDLE;
-  headStates[headNumber].startColor = colorToStopAt;
-  headStates[headNumber].currColor = colorToStopAt;
-  headStates[headNumber].nextColor = colorToStopAt;
-  headStates[headNumber].frame = 0;
+  headStates[headIndex].headStatus = STATE_IDLE;
+  headStates[headIndex].startColor = colorToStopAt;
+  headStates[headIndex].currColor = colorToStopAt;
+  headStates[headIndex].nextColor = colorToStopAt;
+  headStates[headIndex].frame = 0;
 }
 
-void stopAtDeEnergizedFunc( uint8_t headNumber, byte colorToStopAt=RED ) 
+void stopAtDeEnergizedFunc( uint8_t headIndex, byte colorToStopAt=RED ) 
 {
-  if(headStates[headNumber].frame < 52) 
+  if(headStates[headIndex].frame < 52) 
   {
-    setSoftPWMValues( headNumber, (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].red / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].grn / 63, 
-                                  (uint8_t) bypassColor[headStates[headNumber].frame] * colorCache[colorToStopAt].blu / 63 );
-    headStates[headNumber].frame ++;
-    headStates[headNumber].lastAnimateTime = millis();
+    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].red / 31, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].grn / 31, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].blu / 31 );
+    headStates[headIndex].frame ++;
+    headStates[headIndex].lastAnimateTime = millis();
     return;
   }
-  headStates[headNumber].headStatus = STATE_IDLE;
-  headStates[headNumber].startColor = colorToStopAt;
-  headStates[headNumber].currColor = colorToStopAt;
-  headStates[headNumber].nextColor = colorToStopAt;
-  headStates[headNumber].frame = 0;
+  headStates[headIndex].headStatus = STATE_IDLE;
+  headStates[headIndex].startColor = colorToStopAt;
+  headStates[headIndex].currColor = colorToStopAt;
+  headStates[headIndex].nextColor = colorToStopAt;
+  headStates[headIndex].frame = 0;
 }
