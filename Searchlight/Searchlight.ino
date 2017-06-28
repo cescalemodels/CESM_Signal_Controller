@@ -100,7 +100,6 @@ void setup()
   Palatis::SoftPWM.begin(120);                                         //  Begin soft PWM with 60hz pwm frequency
   #endif
 
-  #define RESET_CVS_ON_POWER
   #ifdef RESET_CVS_ON_POWER
   notifyCVResetFactoryDefault();                                      //  Force Restore to factory defaults whenever decoder is restarted (enable in config)
   #endif
@@ -108,6 +107,8 @@ void setup()
   baseAddress = Dcc.getAddr();                                        //  Preload the decoder address
   commonPole = Dcc.getCV(55);                                         //  Preload commonpole variable
 
+#ifndef SERIAL_DEBUG
+<<<<<<< HEAD
   for(int i = 0; i < NUM_HEADS ; i++) 
   { 
     setSoftPWMValues( i, 0, 0, 0, 0 );
@@ -122,6 +123,7 @@ void setup()
     delay(500);
     setSoftPWMValues( i, colorCache[1].red, colorCache[1].grn, colorCache[1].blu, 0 );
   }
+#endif
 }
 
 /////////////////
@@ -440,6 +442,7 @@ void notifyDccAccOutputAddrSet( uint16_t OutputAddr )
 //  SOFT PWM SETTING FUNCTION  //
 /////////////////////////////////
 
+<<<<<<< HEAD
 void setSoftPWMValues( uint8_t headIndex, uint8_t redVal, uint8_t grnVal, uint8_t bluVal, boolean updateStored )  //  Sets the PWM values of each LED in a certain head
 {
 #ifndef SERIAL_DEBUG          
@@ -447,6 +450,32 @@ void setSoftPWMValues( uint8_t headIndex, uint8_t redVal, uint8_t grnVal, uint8_
   Palatis::SoftPWM.set(   headIndex * 3      , (uint8_t) abs( redVal - ( 32 * commonPole ) ) );
   Palatis::SoftPWM.set( ( headIndex * 3 ) + 1, (uint8_t) abs( grnVal - ( 32 * commonPole ) ) );
   Palatis::SoftPWM.set( ( headIndex * 3 ) + 2, (uint8_t) abs( bluVal - ( 32 * commonPole ) ) );
+=======
+void setSoftPWMValues( uint8_t headIndex, uint8_t redVal, uint8_t grnVal, uint8_t bluVal, byte updateStored )  //  Sets the PWM values of each LED in a certain head
+{
+  //  Functions that set the soft PWM values based on the requested value and the common pole variable
+  uint8_t rV = abs( redVal - ( 31 * commonPole ) );
+  uint8_t gV = abs( grnVal - ( 31 * commonPole ) );
+  uint8_t bV = abs( bluVal - ( 31 * commonPole ) );    
+
+#ifdef SERIAL_DEBUG          
+  Serial.print("setSoftPWMValues: ");
+  Serial.print(redVal);
+  Serial.print('-');
+  Serial.print(rV);
+  Serial.print(' ');
+  Serial.print(grnVal);
+  Serial.print('-');
+  Serial.print(gV);
+  Serial.print(' ');
+  Serial.print(bluVal);
+  Serial.print('-');
+  Serial.println(bV);
+#else
+  Palatis::SoftPWM.set(   headIndex * 3      , rV );
+  Palatis::SoftPWM.set( ( headIndex * 3 ) + 1, gV );
+  Palatis::SoftPWM.set( ( headIndex * 3 ) + 2, bV );
+>>>>>>> 3fd501381831053d0c1dd7e88a9aa935ffbc4de7
 #endif
   //  Update the head states with the current values of the LEDs
   if(updateStored) {
@@ -510,7 +539,7 @@ void stopAtEnergizedFunc( uint8_t headIndex, byte colorToStopAt )
   headStates[headIndex].frame = 0;
 }
 
-void stopAtDeEnergizedFunc( uint8_t headIndex, byte colorToStopAt=RED ) 
+void stopAtDeEnergizedFunc( uint8_t headIndex, byte colorToStopAt ) 
 {
   if(headStates[headIndex].frame < 52) 
   {
