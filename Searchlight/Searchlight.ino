@@ -66,7 +66,7 @@ void leaveColorFunc( uint8_t, byte );
 void bypassColorFunc( uint8_t, byte );
 void stopAtEnergizedFunc( uint8_t, byte );
 void stopAtDeEnergizedFunc( uint8_t, byte=RED );
-void setSoftPWMValues( uint8_t, uint8_t, uint8_t, uint8_t, byte=ON );
+void setSoftPWMValues( uint8_t, uint8_t, uint8_t, uint8_t, boolean );
 
 /////////////
 //  SETUP  //
@@ -108,17 +108,20 @@ void setup()
   baseAddress = Dcc.getAddr();                                        //  Preload the decoder address
   commonPole = Dcc.getCV(55);                                         //  Preload commonpole variable
 
-  setSoftPWMValues( 0, 0, 0, 0 );
-  delay(5000);
-  setSoftPWMValues( 0, 31, 0, 0 );
-  delay(5000);
-  setSoftPWMValues( 0, 0, 31, 0 );
-  delay(5000);
-  setSoftPWMValues( 0, 0, 0, 31 );
-  delay(5000);
-  setSoftPWMValues( 0, 31, 31, 31 );
-  delay(5000);
-  setSoftPWMValues( 0, colorCache[1].red, colorCache[1].grn, colorCache[1].blu );
+  for(int i = 0; i < NUM_HEADS ; i++) 
+  { 
+    setSoftPWMValues( i, 0, 0, 0, 0 );
+    delay(500);
+    setSoftPWMValues( i, 32, 0, 0, 0 );
+    delay(500);
+    setSoftPWMValues( i, 0, 32, 0, 0 );
+    delay(500);
+    setSoftPWMValues( i, 0, 0, 32, 0 );
+    delay(500);
+    setSoftPWMValues( i, 32, 32, 32, 0 );
+    delay(500);
+    setSoftPWMValues( i, colorCache[1].red, colorCache[1].grn, colorCache[1].blu, 0 );
+  }
 }
 
 /////////////////
@@ -210,19 +213,19 @@ void loop()
       }
     }
     //  If the signal is not currently animating, and it's either set to flashing or vane plus flashing mode...
-    if( ( headStates[headIndex].headStatus != STATE_ANIMATE ) && ( headStates[headIndex].effect == EFFECT_FLASHING ) )
+    if( ( headStates[headIndex].headStatus != STATE_ANIMATE ) && ( headStates[headIndex].headStatus != STATE_ANIMATE_BLACK ) && ( headStates[headIndex].effect == EFFECT_FLASHING ) )
     {
       if( ( millis() - headStates[headIndex].lastAnimateTime ) > FLASH_PULSE_DELAY ) 
       {
         headStates[headIndex].lastAnimateTime = millis();
       }
       if( ( millis() - headStates[headIndex].lastAnimateTime ) <= ( FLASH_PULSE_DELAY / 2 ) )
-      { 
-        setSoftPWMValues( headIndex, 0, 0, 0, OFF );
+      {
+        setSoftPWMValues( headIndex, colorCache[headStates[headIndex].currColor].red, colorCache[headStates[headIndex].currColor].grn, colorCache[headStates[headIndex].currColor].blu, 0 );
       }
       else
       {
-        setSoftPWMValues( headIndex, headStates[headIndex].colorInfo.red, headStates[headIndex].colorInfo.blu, headStates[headIndex].colorInfo.blu );
+        setSoftPWMValues( headIndex, 0, 0, 0, 0 );
       }   
     }
   }
@@ -437,13 +440,13 @@ void notifyDccAccOutputAddrSet( uint16_t OutputAddr )
 //  SOFT PWM SETTING FUNCTION  //
 /////////////////////////////////
 
-void setSoftPWMValues( uint8_t headIndex, uint8_t redVal, uint8_t grnVal, uint8_t bluVal, byte updateStored=ON )  //  Sets the PWM values of each LED in a certain head
+void setSoftPWMValues( uint8_t headIndex, uint8_t redVal, uint8_t grnVal, uint8_t bluVal, boolean updateStored )  //  Sets the PWM values of each LED in a certain head
 {
 #ifndef SERIAL_DEBUG          
   //  Functions that set the soft PWM values based on the requested value and the common pole variable                                                         
-  Palatis::SoftPWM.set(   headIndex * 3      , (uint8_t) abs( redVal - ( 31 * commonPole ) ) );
-  Palatis::SoftPWM.set( ( headIndex * 3 ) + 1, (uint8_t) abs( grnVal - ( 31 * commonPole ) ) );
-  Palatis::SoftPWM.set( ( headIndex * 3 ) + 2, (uint8_t) abs( bluVal - ( 31 * commonPole ) ) );
+  Palatis::SoftPWM.set(   headIndex * 3      , (uint8_t) abs( redVal - ( 32 * commonPole ) ) );
+  Palatis::SoftPWM.set( ( headIndex * 3 ) + 1, (uint8_t) abs( grnVal - ( 32 * commonPole ) ) );
+  Palatis::SoftPWM.set( ( headIndex * 3 ) + 2, (uint8_t) abs( bluVal - ( 32 * commonPole ) ) );
 #endif
   //  Update the head states with the current values of the LEDs
   if(updateStored) {
@@ -461,9 +464,9 @@ void leaveColorFunc( uint8_t headIndex, byte colorToLeave )
 {
   if(headStates[headIndex].frame < 12)
   {
-    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToLeave].red / 31, 
-                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToLeave].grn / 31, 
-                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToLeave].blu / 31 );
+    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToLeave].red / 32, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToLeave].grn / 32, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToLeave].blu / 32, 1 );
     headStates[headIndex].frame ++;
     headStates[headIndex].lastAnimateTime = millis();
     return;
@@ -477,9 +480,9 @@ void bypassColorFunc( uint8_t headIndex, byte colorToPass)
 {
   if(headStates[headIndex].frame < 8) 
   {
-    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToPass].red / 31, 
-                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToPass].grn / 31, 
-                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToPass].blu / 31 );
+    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToPass].red / 32, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToPass].grn / 32, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToPass].blu / 32, 1 );
     headStates[headIndex].frame ++;
     headStates[headIndex].lastAnimateTime = millis();
     return;
@@ -493,9 +496,9 @@ void stopAtEnergizedFunc( uint8_t headIndex, byte colorToStopAt )
 {
   if(headStates[headIndex].frame < 33) 
   {
-    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].red / 31, 
-                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].grn / 31, 
-                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].blu / 31 );
+    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].red / 32, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].grn / 32, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].blu / 32, 1 );
     headStates[headIndex].frame ++;
     headStates[headIndex].lastAnimateTime = millis();
     return;
@@ -511,9 +514,9 @@ void stopAtDeEnergizedFunc( uint8_t headIndex, byte colorToStopAt=RED )
 {
   if(headStates[headIndex].frame < 52) 
   {
-    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].red / 31, 
-                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].grn / 31, 
-                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].blu / 31 );
+    setSoftPWMValues( headIndex, (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].red / 32, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].grn / 32, 
+                                  (uint8_t) bypassColor[headStates[headIndex].frame] * colorCache[colorToStopAt].blu / 32, 1 );
     headStates[headIndex].frame ++;
     headStates[headIndex].lastAnimateTime = millis();
     return;

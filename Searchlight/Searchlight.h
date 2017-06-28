@@ -48,7 +48,7 @@ uint8_t commonPole;                                                   //  Keeps 
 //  SET UP EFFECT TIMER VARIABLES  //
 ///////////////////////////////////// 
 
-#define ANIMATE_DELAY_TIME 20
+#define ANIMATE_DELAY_TIME 30
 #define FLASH_PULSE_DELAY 1000
 
 ////////////////////////////////////
@@ -98,21 +98,21 @@ CVPair FactoryDefaultCVs[] =
   {36, 0},                                                            //  Dark aspect green LED intensity (0 = 0%, 63 = 100%)
   {37, 0},                                                            //  Dark aspect blue LED intensity (0 = 0%, 63 = 100%)
   
-  {38, 31},                                                           //  Red aspect red LED intensity (0 = 0%, 63 = 100%)
+  {38, 32},                                                           //  Red aspect red LED intensity (0 = 0%, 63 = 100%)
   {39, 0},                                                            //  Red aspect green LED intensity (0 = 0%, 63 = 100%)
   {40, 0},                                                            //  Red aspect blue LED intensity (0 = 0%, 63 = 100%)
   
   {41, 0},                                                            //  Green aspect red LED intensity (0 = 0%, 63 = 100%)
-  {42, 31},                                                           //  Green aspect green LED intensity (0 = 0%, 63 = 100%)
+  {42, 32},                                                           //  Green aspect green LED intensity (0 = 0%, 63 = 100%)
   {43, 0},                                                            //  Green aspect blue LED intensity (0 = 0%, 63 = 100%)
   
-  {44, 31},                                                           //  Yellow aspect red LED intensity (0 = 0%, 63 = 100%)
-  {45, 31},                                                           //  Yellow aspect green LED intensity (0 = 0%, 63 = 100%)
+  {44, 32},                                                           //  Yellow aspect red LED intensity (0 = 0%, 63 = 100%)
+  {45, 32},                                                           //  Yellow aspect green LED intensity (0 = 0%, 63 = 100%)
   {46, 0},                                                            //  Yellow aspect blue LED intensity (0 = 0%, 63 = 100%)
   
-  {47, 31},                                                           //  Lunar aspect red LED intensity (0 = 0%, 63 = 100%)
-  {48, 31},                                                           //  Lunar aspect green LED intensity (0 = 0%, 63 = 100%)
-  {49, 31},                                                           //  Lunar aspect blue LED intensity (0 = 0%, 63 = 100%)
+  {47, 32},                                                           //  Lunar aspect red LED intensity (0 = 0%, 63 = 100%)
+  {48, 32},                                                           //  Lunar aspect green LED intensity (0 = 0%, 63 = 100%)
+  {49, 32},                                                           //  Lunar aspect blue LED intensity (0 = 0%, 63 = 100%)
   
   {53, 1},                                                            //  Enable/Disable vane movement
   {54, 1},                                                            //  Enable/Disable flashing 
@@ -121,11 +121,11 @@ CVPair FactoryDefaultCVs[] =
 };
 
 // The following four lists define the intensities of the colors at different points along the animation. They scale from 0 to 63.
-const byte bypassColor[] = {3, 11, 24, 31, 25, 8, 3, 0};
-const byte leaveColor[] = {31, 29,  25,  19,  14,  5, 17,  24,  19,  8, 6, 0};
-const byte stopAtEnergized[] = {3, 7, 10, 14, 18, 25, 30, 31, 31, 26, 13, 19, 25, 29, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 31, 24, 19, 22, 29, 31};
-const byte stopAtNonEnergized[] = {1, 2, 6, 16, 19, 22, 27, 31, 31, 31, 31, 31, 31, 31, 31, 31, 29, 26, 21, 14, 10, 3, 3, 5, 7, 11, 14, 18, 22, 28, 31, 31, 31, 31, 
-                                                                                              31, 31, 31, 31, 31, 31, 31, 29, 27, 24, 21, 16, 14, 18, 21, 25, 28, 31};
+const byte bypassColor[] = {3, 11, 24, 32, 25, 8, 3, 0};
+const byte leaveColor[] = {32, 29,  25,  19,  14,  5, 17,  24,  19,  8, 6, 0};
+const byte stopAtEnergized[] = {3, 7, 10, 14, 18, 25, 30, 32, 32, 26, 13, 19, 25, 29, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 24, 19, 22, 29, 32};
+const byte stopAtNonEnergized[] = {1, 2, 6, 16, 19, 22, 27, 32, 32, 32, 32, 32, 32, 32, 32, 32, 29, 26, 21, 14, 10, 3, 3, 5, 7, 11, 14, 18, 22, 28, 32, 32, 32, 32, 
+                                                                                              32, 32, 32, 32, 32, 32, 32, 29, 27, 24, 21, 16, 14, 18, 21, 25, 28, 32};
 
 typedef struct 
 {
